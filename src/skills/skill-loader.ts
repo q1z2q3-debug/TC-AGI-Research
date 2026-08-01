@@ -4,6 +4,7 @@
  */
 
 import { MemorySystem } from '../memory/memory-system';
+import { EmbeddingProvider, cosineSimilarity } from '../cognitive/embedding';
 
 export interface Skill {
   name: string;
@@ -11,15 +12,37 @@ export interface Skill {
   instructions: string;
   memoryEnabled: boolean;
   execute: (params: any) => Promise<any>;
+  /** 语义向量（由 EmbeddingClient 计算，用于余弦检索） */
+  embedding?: number[];
+}
+
+/** 技能匹配结果 */
+export interface SkillMatch {
+  skill: Skill;
+  score: number;
+  /** 命中来源：embedding 语义检索 / keyword 关键词回退 */
+  source: 'embedding' | 'keyword';
 }
 
 export class SkillLoader {
   private memory: MemorySystem;
   private skills: Map<string, Skill> = new Map();
   private loaded = false;
+  private embeddingClient: EmbeddingProvider | null = null;
+  private indexed = false;
 
   constructor(memory: MemorySystem) {
     this.memory = memory;
+  }
+
+  /** 接入嵌入客户端（本地 Ollama 等），用于语义检索 */
+  setEmbeddingClient(client: EmbeddingProvider): void {
+    this.embeddingClient = client;
+  }
+
+  /** 是否已配置嵌入客户端 */
+  get hasEmbedding(): boolean {
+    return this.embeddingClient !== null;
   }
 
   async loadAll(): Promise<void> {
@@ -169,6 +192,71 @@ export class SkillLoader {
 
   getAllSkills(): Skill[] {
     return Array.from(this.skills.values());
+  }
+
+  /**
+   * 构建技能语义索引：为每个技能计算嵌入向量。
+   * 无客户端或任意技能嵌入失败时优雅跳过（不改写已有向量）。
+   * 幂等：可重复调用（如运行时新增技能后重建）。
+   */
+  async buildIndex(): Promise<void> {
+    if (!this.embeddingClient) return;
+    for (const skill of this.skills.values()) {
+      // 已索引则跳过，避免重复计算
+      if (skill.embedding) continue;
+      const text = `${skill.name} ${skill.description} ${skill.instructions}`;
+      try {
+        const vec = await this.embeddingClient.embed(text);
+        if (vec) skill.embedding = vec;
+      } catch {
+        // 单条失败不影响其余
+      }
+    }
+    this.indexed = true;
+  }
+
+  /**
+   * 语义检索最相关技能（替代脆弱的 goal.includes 关键词匹配）。
+   * 有嵌入向量时按余弦相似度排序；否则回退关键词子串匹配。
+   *
+   * @param goal   任务目标
+   * @param topK   返回数量上限
+   * @param threshold 最小相似度阈值（余弦，-1~1）；低于此值不返回
+   */
+  async matchSkills(goal: string, topK = 3, threshold = 0.25): Promise<SkillMatch[]> {
+    if (!goal) return [];
+
+    // 优先：嵌入语义检索
+    if (this.embeddingClient) {
+      let goalVec: number[] | null = null;
+      try {
+        goalVec = await this.embeddingClient.embed(goal);
+      } catch {
+        goalVec = null;
+      }
+      if (goalVec) {
+        const scored: SkillMatch[] = [];
+        for (const skill of this.skills.values()) {
+          if (!skill.embedding) continue;
+          const score = cosineSimilarity(goalVec, skill.embedding);
+          if (score >= threshold) {
+            scored.push({ skill, score, source: 'embedding' });
+          }
+        }
+        scored.sort((a, b) => b.score - a.score);
+        return scored.slice(0, topK);
+      }
+    }
+
+    // 回退：关键词子串匹配（无嵌入或嵌入失败）
+    const g = goal.toLowerCase();
+    const scored: SkillMatch[] = [];
+    for (const skill of this.skills.values()) {
+      if (g.includes(skill.name.toLowerCase()) || g.includes(skill.description.toLowerCase())) {
+        scored.push({ skill, score: 1, source: 'keyword' });
+      }
+    }
+    return scored.slice(0, topK);
   }
 
   /**

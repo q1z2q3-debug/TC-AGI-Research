@@ -64,8 +64,8 @@ export class InstanceLayer {
     this.events.next({ type: 'task-received', taskId, task, context });
 
     try {
-      // 3. 引擎分解任务
-      const plan = this.engine.decomposeTask(task, { ...context, taskId });
+      // 3. 引擎分解任务（语义检索技能/工具）
+      const plan = await this.engine.decomposeTask(task, { ...context, taskId });
       taskCtx.plan = plan;
       taskCtx.status = 'running';
 

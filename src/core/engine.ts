@@ -7,8 +7,8 @@
 import { IdeologyLayer } from './ideology';
 import { CognitiveSpace } from '../cognitive/cognitive-space';
 import { MemorySystem } from '../memory/memory-system';
-import { SkillLoader } from '../skills/skill-loader';
-import { MCPAdapter } from '../tools/mcp-adapter';
+import { SkillLoader, SkillMatch } from '../skills/skill-loader';
+import { MCPAdapter, ToolMatch } from '../tools/mcp-adapter';
 import { CronScheduler } from '../scheduler/cron-scheduler';
 import { Subject } from 'rxjs';
 import { v4 as uuidv4 } from 'uuid';
@@ -84,7 +84,7 @@ export class EngineLayer {
   /**
    * 认知驱动的任务分解
    */
-  decomposeTask(goal: string, context?: any): TaskPlan {
+  async decomposeTask(goal: string, context?: any): Promise<TaskPlan> {
     // 1. 感知当前认知状态
     const cognitiveState = this.cognitive.perceive(goal);
 
@@ -94,12 +94,12 @@ export class EngineLayer {
     // 3. 获取相关记忆
     const memories = this.memory.retrieve(goal, 5);
 
-    // 4. 获取可用技能和工具
-    const availableSkills = this.skillLoader.getAvailableSkills();
-    const availableTools = this.mcp.getAvailableTools();
+    // 4. 语义检索最相关技能与工具（替代脆弱的关键词匹配）
+    const skillMatches = await this.skillLoader.matchSkills(goal, 5, 0.25);
+    const toolMatches = await this.mcp.matchTools(goal, 5, 0.25);
 
     // 5. 生成步骤
-    const steps = this.generateSteps(goal, strategy, availableSkills, availableTools, memories);
+    const steps = this.generateSteps(goal, strategy, skillMatches, toolMatches, memories);
 
     const plan: TaskPlan = {
       id: `plan-${uuidv4().slice(0, 8)}`,
@@ -188,8 +188,8 @@ export class EngineLayer {
   private generateSteps(
     goal: string,
     strategy: any,
-    skills: string[],
-    tools: string[],
+    skillMatches: SkillMatch[],
+    toolMatches: ToolMatch[],
     memories: any[]
   ): TaskStep[] {
     const steps: TaskStep[] = [];
@@ -252,18 +252,15 @@ export class EngineLayer {
       };
     }
 
-    // 尝试匹配技能
-    for (const skill of skills) {
-      if (goal.toLowerCase().includes(skill.toLowerCase())) {
-        mainStep.skill = skill;
-        break;
-      }
+    // 尝试匹配技能（语义检索优先，无向量时自动回退关键词）
+    const bestSkill = skillMatches[0];
+    if (bestSkill && bestSkill.score > 0) {
+      mainStep.skill = bestSkill.skill.name;
     }
-    for (const tool of tools) {
-      if (goal.toLowerCase().includes(tool.toLowerCase())) {
-        mainStep.tool = tool;
-        break;
-      }
+    // 尝试匹配工具
+    const bestTool = toolMatches[0];
+    if (bestTool && bestTool.score > 0) {
+      mainStep.tool = bestTool.tool.name;
     }
 
     steps.push(mainStep);

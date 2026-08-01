@@ -3,11 +3,22 @@
  * 连接并管理远程或本机 MCP 服务
  */
 
+import { EmbeddingProvider, cosineSimilarity } from '../cognitive/embedding';
+
 export interface MCPTool {
   name: string;
   description: string;
   parameters: any;
   execute: (params: any) => Promise<any>;
+  /** 语义向量（用于余弦检索） */
+  embedding?: number[];
+}
+
+/** 工具匹配结果 */
+export interface ToolMatch {
+  tool: MCPTool;
+  score: number;
+  source: 'embedding' | 'keyword';
 }
 
 export interface MCPServer {
@@ -22,6 +33,16 @@ export class MCPAdapter {
   private tools: Map<string, MCPTool> = new Map();
   private servers: Map<string, MCPServer> = new Map();
   private initialized = false;
+  private embeddingClient: EmbeddingProvider | null = null;
+
+  /** 接入嵌入客户端，用于工具语义检索 */
+  setEmbeddingClient(client: EmbeddingProvider): void {
+    this.embeddingClient = client;
+  }
+
+  get hasEmbedding(): boolean {
+    return this.embeddingClient !== null;
+  }
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -99,6 +120,61 @@ export class MCPAdapter {
 
   getAllTools(): MCPTool[] {
     return Array.from(this.tools.values());
+  }
+
+  /**
+   * 构建工具语义索引（同 SkillLoader.buildIndex 语义）。
+   */
+  async buildIndex(): Promise<void> {
+    if (!this.embeddingClient) return;
+    for (const tool of this.tools.values()) {
+      if (tool.embedding) continue;
+      const text = `${tool.name} ${tool.description}`;
+      try {
+        const vec = await this.embeddingClient.embed(text);
+        if (vec) tool.embedding = vec;
+      } catch {
+        // 单条失败忽略
+      }
+    }
+  }
+
+  /**
+   * 语义检索最相关工具（替代 goal.includes 关键词匹配）。
+   * 有向量时按余弦相似度；否则回退关键词子串匹配。
+   */
+  async matchTools(goal: string, topK = 3, threshold = 0.25): Promise<ToolMatch[]> {
+    if (!goal) return [];
+
+    if (this.embeddingClient) {
+      let goalVec: number[] | null = null;
+      try {
+        goalVec = await this.embeddingClient.embed(goal);
+      } catch {
+        goalVec = null;
+      }
+      if (goalVec) {
+        const scored: ToolMatch[] = [];
+        for (const tool of this.tools.values()) {
+          if (!tool.embedding) continue;
+          const score = cosineSimilarity(goalVec, tool.embedding);
+          if (score >= threshold) {
+            scored.push({ tool, score, source: 'embedding' });
+          }
+        }
+        scored.sort((a, b) => b.score - a.score);
+        return scored.slice(0, topK);
+      }
+    }
+
+    const g = goal.toLowerCase();
+    const scored: ToolMatch[] = [];
+    for (const tool of this.tools.values()) {
+      if (g.includes(tool.name.toLowerCase()) || g.includes(tool.description.toLowerCase())) {
+        scored.push({ tool, score: 1, source: 'keyword' });
+      }
+    }
+    return scored.slice(0, topK);
   }
 
   /**

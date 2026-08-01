@@ -18,6 +18,7 @@
 import 'dotenv/config';
 import { getDefaultAGI } from './index';
 import { DeepSeekClient } from './cognitive/llm';
+import { EmbeddingClient } from './cognitive/embedding';
 
 const SELF_PROMPTS = [
   '回顾今日认知，巩固核心信念，规划下一步进化方向',
@@ -29,6 +30,19 @@ const SELF_PROMPTS = [
 
 async function main() {
   const agi = await getDefaultAGI();
+
+  // 接入本地 Ollama 语义嵌入（零成本；不可用时技能/工具匹配自动回退关键词）
+  if (process.env.EMBEDDING_ENABLED !== 'false') {
+    const embedding = new EmbeddingClient();
+    agi.setEmbedding(embedding);
+    const embAvail = await embedding.isAvailable();
+    console.log(embAvail
+      ? '🔎 语义检索已接入 (Ollama embeddings)'
+      : 'ℹ️ Ollama 嵌入不可达，技能/工具匹配回退关键词（设置 EMBEDDING_BASE_URL 可启用）');
+  } else {
+    console.log('ℹ️ 已禁用嵌入检索 (EMBEDDING_ENABLED=false)，使用关键词匹配');
+  }
+
   if (!agi.isRunning()) {
     await agi.start();
   }

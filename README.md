@@ -35,6 +35,12 @@
 3. 写入记忆（持久化）
 4. 优化流程（新技能/新工具）
 
+### 5. 技能/工具语义检索（替代关键词匹配）
+引擎在任务分解时，不再用脆弱的 `goal.includes(skill)` 子串匹配，而是通过 **余弦相似度** 从向量索引中检索最相关的技能与工具：
+- **嵌入来源**：默认本地 **Ollama**（`nomic-embed-text`），零 API 成本、零密钥
+- **优雅降级**：Ollama 不可达 / 未配置时，自动回退关键词匹配，绝不报错
+- **阈值可调**：`matchSkills(goal, topK, threshold)`，默认阈值 `0.25` 过滤弱相关
+
 ## 目录结构
 
 ```
@@ -49,7 +55,8 @@ TC-AGI-Research/
 │   │   ├── cognitive-space.ts # 认知空间管理
 │   │   ├── deepseek-cognize.ts # 认知循环（接真实 LLM）
 │   │   ├── semantic.ts     # 语义坐标映射（认知/记忆共用）
-│   │   └── llm.ts          # DeepSeek 客户端（优雅降级）
+│   │   ├── llm.ts          # DeepSeek 客户端（优雅降级）
+│   │   └── embedding.ts    # 本地 Ollama 语义嵌入（余弦检索，降级关键词）
 │   ├── memory/             # 记忆系统
 │   │   ├── memory-system.ts
 │   │   └── memory-store.ts
@@ -98,6 +105,9 @@ npm run start:daemon
 | `DEEPSEEK_BASE_URL` | DeepSeek 端点 | `https://api.deepseek.com` |
 | `DEEPSEEK_MODEL` | 模型名 | `deepseek-chat` |
 | `LOOP_INTERVAL_SEC` | 守护进程循环间隔（秒） | `30` |
+| `EMBEDDING_ENABLED` | 是否启用语义嵌入检索 | `true` |
+| `EMBEDDING_BASE_URL` | Ollama embeddings 端点 | `http://localhost:11434` |
+| `EMBEDDING_MODEL` | 嵌入模型名 | `nomic-embed-text` |
 
 > 密钥只从环境变量读取，绝不硬编码进仓库；`.env` 已被 `.gitignore` 忽略。
 
@@ -129,7 +139,7 @@ await agi.shutdown();
 
 ## 版本
 
-v0.2.0-cognitive
+v0.3.0-cognitive
 
 ## 许可证
 

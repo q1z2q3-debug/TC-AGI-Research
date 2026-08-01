@@ -8,6 +8,7 @@ import { EngineLayer } from '../core/engine';
 import { InstanceLayer } from '../core/instance';
 import { CognitiveSpace } from '../cognitive/cognitive-space';
 import { DeepSeekCognize } from '../cognitive/deepseek-cognize';
+import { EmbeddingClient, EmbeddingProvider } from '../cognitive/embedding';
 import { MemorySystem } from '../memory/memory-system';
 import { SkillLoader } from '../skills/skill-loader';
 import { MCPAdapter } from '../tools/mcp-adapter';
@@ -58,6 +59,15 @@ export class TCAGI4 {
     return this.started;
   }
 
+  /**
+   * 接入嵌入客户端（本地 Ollama 等），供技能/工具语义检索。
+   * 应在 start() 之前调用，以便启动时构建向量索引。
+   */
+  setEmbedding(client: EmbeddingProvider): void {
+    this.skillLoader.setEmbeddingClient(client);
+    this.mcp.setEmbeddingClient(client);
+  }
+
   async start(): Promise<void> {
     if (this.started) {
       console.log('⚠️ 系统已在运行中');
@@ -82,6 +92,10 @@ export class TCAGI4 {
 
       // 5. MCP 工具
       await this.mcp.initialize();
+
+      // 5.5 构建技能/工具语义索引（若已接入嵌入客户端）
+      await this.skillLoader.buildIndex();
+      await this.mcp.buildIndex();
 
       // 6. 调度器
       await this.scheduler.initialize();
