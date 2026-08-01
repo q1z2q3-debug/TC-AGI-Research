@@ -53,33 +53,62 @@ export class MCPAdapter {
   }
 
   private registerDefaultTools(): void {
-    // 文件操作工具
+    // 文件操作工具（真实实现）
     this.tools.set('file-read', {
       name: 'file-read',
-      description: '读取本地文件',
+      description: '读取本地文件内容',
       parameters: { path: 'string' },
       execute: async (params: any) => {
-        // 实际实现需要文件系统 API
-        return { content: `读取文件: ${params.path}`, status: 'simulated' };
+        const fs = await import('fs');
+        if (!fs.existsSync(params.path)) {
+          return { error: `文件不存在: ${params.path}`, status: 'error' };
+        }
+        const content = fs.readFileSync(params.path, 'utf-8');
+        return { content, path: params.path, size: content.length, status: 'ok' };
       }
     });
 
     this.tools.set('file-write', {
       name: 'file-write',
-      description: '写入本地文件',
+      description: '写入本地文件（自动创建目录）',
       parameters: { path: 'string', content: 'string' },
       execute: async (params: any) => {
-        return { path: params.path, status: 'simulated' };
+        const fs = await import('fs');
+        const path = await import('path');
+        const dir = path.dirname(params.path);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(params.path, params.content, 'utf-8');
+        const stat = fs.statSync(params.path);
+        return { path: params.path, size: stat.size, status: 'ok' };
       }
     });
 
-    // Shell 执行工具
+    // Shell 执行工具（真实实现）
     this.tools.set('shell-exec', {
       name: 'shell-exec',
-      description: '执行 Shell 命令',
-      parameters: { command: 'string' },
+      description: '执行 Shell 命令，返回标准输出和标准错误',
+      parameters: { command: 'string', timeout: 'number' },
       execute: async (params: any) => {
-        return { command: params.command, stdout: 'simulated output', stderr: '' };
+        const { execSync } = await import('child_process');
+        const timeout = params.timeout || 30000;
+        try {
+          const stdout = execSync(params.command, {
+            encoding: 'utf-8',
+            timeout,
+            maxBuffer: 10 * 1024 * 1024
+          });
+          return { command: params.command, stdout, stderr: '', exitCode: 0, status: 'ok' };
+        } catch (e: any) {
+          return {
+            command: params.command,
+            stdout: e.stdout || '',
+            stderr: e.stderr || String(e),
+            exitCode: e.status || -1,
+            status: 'error'
+          };
+        }
       }
     });
 
