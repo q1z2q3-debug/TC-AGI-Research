@@ -1,12 +1,6 @@
 /**
  * DeepSeekCognize 认知循环
  * 觉知 → 推理 → 进化 → 自知
- *
- * 四步闭环：
- * 1. 觉知 (perceive): 输入 → Trit分解 → 卦象坐标 → π/e调节
- * 2. 推理 (reason): 基于认知状态 → 派生行动策略
- * 3. 进化 (evolve): 任务结果反馈 → 调整认知向量
- * 4. 自知 (get_state): 返回完整认知态势快照
  */
 
 import { CognitiveSpace, CognitiveState, CognitiveSnapshot } from './cognitive-space';
@@ -17,7 +11,7 @@ export interface ActionStrategy {
   description: string;
   priority: number;
   steps: string[];
-  confidence: number; // 0~1
+  confidence: number;
 }
 
 export interface TaskResult {
@@ -35,10 +29,6 @@ export class DeepSeekCognize {
     this.cognitiveSpace = new CognitiveSpace();
   }
 
-  /**
-   * 1. 觉知 (Perceive)
-   * 输入 → Trit分解 → 卦象坐标 → π/e调节
-   */
   perceive(input: string): CognitiveState {
     console.log(`🧠 觉知: 解析 "${input.slice(0, 50)}${input.length > 50 ? '...' : ''}"`);
     const state = this.cognitiveSpace.perceive(input);
@@ -47,10 +37,6 @@ export class DeepSeekCognize {
     return state;
   }
 
-  /**
-   * 2. 推理 (Reason)
-   * 基于认知状态 → 派生行动策略
-   */
   reason(state?: CognitiveState): ActionStrategy {
     const currentState = state || this.cognitiveSpace.getState();
     const snapshot = this.cognitiveSpace.getSnapshot();
@@ -59,15 +45,11 @@ export class DeepSeekCognize {
 
     let strategy: ActionStrategy;
 
-    // 基于认知态势派生策略
     if (majority === 1) {
-      // 扩张态：主动出击
       strategy = this.deriveExpansionStrategy(vector);
     } else if (majority === -1) {
-      // 收缩态：防守反思
       strategy = this.deriveContractionStrategy(vector);
     } else {
-      // 观察态：收集信息
       strategy = this.deriveObservationStrategy(vector);
     }
 
@@ -81,7 +63,6 @@ export class DeepSeekCognize {
     let name = '主动扩张策略';
     let confidence = 0.6;
 
-    // 检查内/外状态
     if (vector.internal === 1 && vector.external === 1) {
       name = '内外协同·全面扩张';
       steps.push('评估外部机会', '调动内部资源', '制定行动方案', '执行并监控');
@@ -99,7 +80,6 @@ export class DeepSeekCognize {
       confidence = 0.55;
     }
 
-    // 因果维度调节
     if (vector.cause === 1 && vector.condition === 1) {
       steps.push('因缘具足·加速推进');
       confidence = Math.min(1, confidence + 0.1);
@@ -140,7 +120,6 @@ export class DeepSeekCognize {
       confidence = 0.5;
     }
 
-    // 因果维度调节
     if (vector.cause === -1) {
       steps.push('重新审视动机·纠正方向');
       confidence = Math.min(1, confidence + 0.1);
@@ -182,7 +161,6 @@ export class DeepSeekCognize {
       confidence = 0.5;
     }
 
-    // 如果过去有经验
     if (vector.past === 1) {
       steps.push('调用历史经验参考');
       confidence += 0.05;
@@ -197,19 +175,13 @@ export class DeepSeekCognize {
     };
   }
 
-  /**
-   * 3. 进化 (Evolve)
-   * 任务结果反馈 → 调整认知向量
-   */
   evolve(result: TaskResult): void {
     console.log(`🔄 进化: ${result.success ? '✅ 成功' : '❌ 失败'} — ${result.goal}`);
 
     const current = this.cognitiveSpace.getState();
     const vector = current.vector;
 
-    // 根据结果调整认知向量
     if (result.success) {
-      // 成功 → 强化正向维度
       const updated = {
         past: 1 as const,
         present: 1 as const,
@@ -221,7 +193,6 @@ export class DeepSeekCognize {
         condition: vector.condition !== -1 ? 1 : 0,
         effect: 1 as const
       };
-      // 保留非负向维度
       const newVector: TritVector = {
         past: updated.past,
         present: updated.present,
@@ -238,7 +209,6 @@ export class DeepSeekCognize {
         summary: `成功进化: ${result.goal}`
       });
     } else {
-      // 失败 → 标记负向维度
       const newVector: TritVector = {
         past: vector.past !== 1 ? -1 : 1,
         present: -1,
@@ -259,58 +229,31 @@ export class DeepSeekCognize {
     console.log(`   认知已更新: ${this.cognitiveSpace.getState().summary}`);
   }
 
-  /**
-   * 4. 自知 (Get State)
-   * 返回完整认知态势快照
-   */
   getState(): CognitiveSnapshot {
     return this.cognitiveSpace.getSnapshot();
   }
 
-  /**
-   * 完整认知循环
-   */
   async cycle(input: string, callback?: (strategy: ActionStrategy) => Promise<TaskResult>): Promise<{
     state: CognitiveState;
     strategy: ActionStrategy;
     result?: TaskResult;
     snapshot: CognitiveSnapshot;
   }> {
-    // 1. 觉知
     const state = this.perceive(input);
-
-    // 2. 推理
     const strategy = this.reason(state);
-
-    // 3. 执行（如果提供了回调）
     let result: TaskResult | undefined;
     if (callback) {
       result = await callback(strategy);
-      // 4. 进化
       this.evolve(result);
     }
-
-    // 5. 自知
     const snapshot = this.getState();
-
-    return {
-      state,
-      strategy,
-      result,
-      snapshot
-    };
+    return { state, strategy, result, snapshot };
   }
 
-  /**
-   * 获取认知空间
-   */
   getCognitiveSpace(): CognitiveSpace {
     return this.cognitiveSpace;
   }
 
-  /**
-   * 获取策略历史
-   */
   getStrategyHistory(): ActionStrategy[] {
     return [...this.strategyHistory];
   }

@@ -22,24 +22,17 @@ export class SkillLoader {
   }
 
   async loadAll() {
-    // 加载内置技能
     await this.loadBuiltinSkills();
-    // 从GitHub导入（示例）
-    // await this.importFromGitHub('https://github.com/user/repo');
-    // 从本地导入
-    // await this.importFromLocal('/path/to/skills');
     console.log(`🔧 技能加载完成: ${this.skills.size} 个技能`);
   }
 
   private async loadBuiltinSkills() {
-    // 加载内置技能
     const webSearchSkill: Skill = {
       name: 'web-search',
       description: '搜索互联网',
       instructions: '使用搜索API获取信息',
       memoryEnabled: true,
       execute: async (params: any) => {
-        // 模拟网络搜索
         return { results: [`模拟搜索结果: ${params.query}`] };
       }
     };
@@ -62,7 +55,6 @@ export class SkillLoader {
       instructions: '复盘并提取经验',
       memoryEnabled: true,
       execute: async (params: any) => {
-        // 使用记忆系统保存经验
         await this.memory.save({
           type: 'feedback',
           name: 'self-evolve-trigger',
@@ -83,20 +75,11 @@ export class SkillLoader {
     return Array.from(this.skills.keys());
   }
 
-  /**
-   * 从GitHub导入技能
-   */
   async importFromGitHub(repoUrl: string): Promise<void> {
-    // 模拟导入
     console.log(`📦 从GitHub导入技能: ${repoUrl}`);
-    // 实际实现需要 fetch API
   }
 
-  /**
-   * 从本地文件夹导入技能
-   */
   async importFromLocal(path: string): Promise<void> {
     console.log(`📁 从本地导入技能: ${path}`);
-    // 实际实现需要文件系统API
   }
 }

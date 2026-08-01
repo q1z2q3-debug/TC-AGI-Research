@@ -10,12 +10,9 @@ export class MemoryStore {
   private initialized = false;
 
   async initialize() {
-    // 模拟IndexedDB初始化
     if (typeof window !== 'undefined' && window.indexedDB) {
-      // 浏览器环境
       await this.initIndexedDB();
     } else {
-      // Node环境：使用内存模拟
       this.db = { memories: [] };
     }
     this.initialized = true;
@@ -45,7 +42,6 @@ export class MemoryStore {
     if (this.db && this.db.memories) {
       return this.db.memories;
     }
-    // IndexedDB读取
     return new Promise((resolve, reject) => {
       const transaction = this.db.transaction(['memories'], 'readonly');
       const store = transaction.objectStore('memories');
@@ -57,7 +53,6 @@ export class MemoryStore {
 
   async save(memory: Memory): Promise<void> {
     if (this.db && this.db.memories) {
-      // 内存模拟
       const index = this.db.memories.findIndex((m: Memory) => m.id === memory.id);
       if (index >= 0) {
         this.db.memories[index] = memory;
@@ -66,7 +61,6 @@ export class MemoryStore {
       }
       return;
     }
-    // IndexedDB保存
     return new Promise((resolve, reject) => {
       const transaction = this.db.transaction(['memories'], 'readwrite');
       const store = transaction.objectStore('memories');

@@ -6,29 +6,19 @@
 import { TritVector, TritVectorOps, Trit } from './trit-vector';
 
 export interface CognitiveState {
-  // 九维向量
   vector: TritVector;
-  // 卦象索引 (0~19682)
   hexagramIndex: number;
-  // π 展开深度 (1~10) — 认知精度
   piDepth: number;
-  // e 呼吸相位权重 (0~1) — 活性/注意力
   eWeight: number;
-  // 时间戳
   timestamp: number;
-  // 认知态势摘要
   summary: string;
 }
 
 export interface CognitiveSnapshot {
   state: CognitiveState;
-  // 时间链预测
   timePropagation: TritVector;
-  // 因果链预测
   causePropagation: TritVector;
-  // 全局态势
   majority: Trit;
-  // 维度分析
   dimensionAnalysis: Record<string, string>;
 }
 
@@ -38,28 +28,21 @@ export class CognitiveSpace {
   private readonly MAX_HISTORY = 100;
 
   constructor() {
-    // 初始状态：全零（悬置观察态）
     const zeroVector = TritVectorOps.zero();
     this.currentState = {
       vector: zeroVector,
       hexagramIndex: TritVectorOps.toHexagramIndex(zeroVector),
-      piDepth: 5,      // 初始中等精度
-      eWeight: 0.5,    // 初始中等活性
+      piDepth: 5,
+      eWeight: 0.5,
       timestamp: Date.now(),
       summary: '认知初始化 — 悬置观察态'
     };
   }
 
-  /**
-   * 获取当前认知状态
-   */
   getState(): CognitiveState {
     return { ...this.currentState };
   }
 
-  /**
-   * 获取完整快照
-   */
   getSnapshot(): CognitiveSnapshot {
     const state = this.currentState;
     const timeProp = TritVectorOps.propagateTime(state.vector);
@@ -89,17 +72,12 @@ export class CognitiveSpace {
     }
   }
 
-  /**
-   * 更新认知状态
-   */
   update(updates: Partial<Omit<CognitiveState, 'timestamp'>>): void {
-    // 保存历史
     this.history.push({ ...this.currentState });
     if (this.history.length > this.MAX_HISTORY) {
       this.history.shift();
     }
 
-    // 更新
     const newVector = updates.vector || this.currentState.vector;
     this.currentState = {
       vector: newVector,
@@ -111,44 +89,24 @@ export class CognitiveSpace {
     };
   }
 
-  /**
-   * 根据输入内容更新认知（觉知）
-   */
   perceive(input: string): CognitiveState {
-    // 1. 内容分析 → 推导Trit向量
     const vector = this.analyzeContent(input);
-
-    // 2. 计算卦象索引
     const hexagramIndex = TritVectorOps.toHexagramIndex(vector);
-
-    // 3. 调整π深度（内容复杂度决定精度）
     const piDepth = this.calcPiDepth(input);
-
-    // 4. 调整e活性（内容新鲜度/重要性）
     const eWeight = this.calcEWeight(input);
-
-    // 5. 生成摘要
     const summary = this.generateSummary(vector);
 
-    // 6. 更新状态
     this.update({ vector, hexagramIndex, piDepth, eWeight, summary });
-
     return this.currentState;
   }
 
-  /**
-   * 内容分析 → Trit向量
-   */
   private analyzeContent(input: string): TritVector {
-    // 简化的内容分析
-    // 实际可实现：NLP情感分析、关键词提取、主题分类等
     let past = 0, present = 0, future = 0;
     let internal = 0, medial = 0, external = 0;
     let cause = 0, condition = 0, effect = 0;
 
     const lower = input.toLowerCase();
 
-    // 时间维度关键词
     if (/过去|历史|曾经|以前/.test(lower)) past = 1;
     else if (/遗忘|忘记|损失/.test(lower)) past = -1;
 
@@ -158,7 +116,6 @@ export class CognitiveSpace {
     if (/未来|将来|计划|目标/.test(lower)) future = 1;
     else if (/焦虑|担心|恐惧/.test(lower)) future = -1;
 
-    // 空间维度关键词
     if (/自己|内心|自我|信念/.test(lower)) internal = 1;
     else if (/内耗|矛盾|冲突/.test(lower)) internal = -1;
 
@@ -168,15 +125,12 @@ export class CognitiveSpace {
     if (/世界|环境|市场|外部/.test(lower)) external = 1;
     else if (/威胁|危险|危机/.test(lower)) external = -1;
 
-    // 因果维度关键词
     if (/因为|所以|原因|动机/.test(lower)) cause = 1;
     if (/条件|机会|资源/.test(lower)) condition = 1;
     if (/结果|成果|实现/.test(lower)) effect = 1;
 
-    // 如果全部为0，使用随机但倾向平衡
     if ([past, present, future, internal, medial, external, cause, condition, effect]
       .every(v => v === 0)) {
-      // 默认为观察态：全部0
       return TritVectorOps.zero();
     }
 
@@ -187,23 +141,14 @@ export class CognitiveSpace {
     };
   }
 
-  /**
-   * 计算π深度（1~10）
-   * 基于输入复杂度
-   */
   private calcPiDepth(input: string): number {
     const length = input.length;
     const uniqueRatio = new Set(input).size / length;
-    // 长度长、独特字符多 → 深度大
     const complexity = Math.min(1, (length / 200) * 0.5 + uniqueRatio * 0.5);
     return Math.max(1, Math.min(10, Math.floor(complexity * 10) + 1));
   }
 
-  /**
-   * 计算e活性权重（0~1）
-   */
   private calcEWeight(input: string): number {
-    // 基于输入中关键词的重要性和新鲜度
     const hasUrgency = /现在|立即|紧急|重要|尽快/.test(input);
     const hasFuture = /未来|计划|目标|方向/.test(input);
     let weight = 0.5;
@@ -212,9 +157,6 @@ export class CognitiveSpace {
     return Math.min(1, weight);
   }
 
-  /**
-   * 生成认知摘要
-   */
   private generateSummary(vector: TritVector): string {
     const parts: string[] = [];
     const majority = TritVectorOps.majority(vector);
@@ -225,7 +167,6 @@ export class CognitiveSpace {
     };
     parts.push(`态势: ${labels[majority]}`);
 
-    // 检查关键特征
     if (vector.internal === 1 && vector.external === -1) {
       parts.push('内核稳固·外境受压');
     }
@@ -242,16 +183,10 @@ export class CognitiveSpace {
     return parts.join(' | ') || '认知平衡·静观其变';
   }
 
-  /**
-   * 获取历史认知状态
-   */
   getHistory(): CognitiveState[] {
     return [...this.history];
   }
 
-  /**
-   * 重置认知状态
-   */
   reset(): void {
     const zero = TritVectorOps.zero();
     this.currentState = {

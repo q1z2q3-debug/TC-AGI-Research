@@ -14,7 +14,6 @@ export class MCPAdapter {
   private tools: Map<string, MCPTool> = new Map();
 
   async initialize() {
-    // 模拟加载MCP工具
     this.tools.set('mcp-example', {
       name: 'mcp-example',
       description: '示例MCP工具',

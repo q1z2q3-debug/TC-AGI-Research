@@ -6,7 +6,7 @@
 export interface ScheduledTask {
   id: string;
   name: string;
-  schedule: string; // cron或RRULE
+  schedule: string;
   action: () => Promise<void>;
   enabled: boolean;
   lastRun?: Date;
@@ -18,7 +18,6 @@ export class CronScheduler {
   private intervals: Map<string, NodeJS.Timeout> = new Map();
 
   async initialize() {
-    // 示例：添加一个定时任务
     this.addTask({
       id: 'daily-report',
       name: '每日报告',
@@ -39,7 +38,6 @@ export class CronScheduler {
   startAll() {
     for (const [id, task] of this.tasks) {
       if (task.enabled) {
-        // 简单模拟：每10秒执行一次
         const interval = setInterval(() => {
           task.action();
         }, 10000);

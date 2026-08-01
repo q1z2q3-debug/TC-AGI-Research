@@ -1,7 +1,6 @@
 /**
  * 研究引擎层 (Engine Layer)
  * 负责推理、学习、决策、任务分解与规划
- * 对应三元一体中的 "研究引擎层"
  */
 
 import { IdeologyLayer } from './ideology';
@@ -58,21 +57,12 @@ export class EngineLayer {
     this.events.next({ type: 'engine-ready' });
   }
 
-  /**
-   * 任务分解：将高层目标拆解为可执行步骤
-   */
   decomposeTask(goal: string, context?: any): TaskPlan {
-    // 基于意识形态分析
     const ideologySummary = this.ideology.summarize();
-    
-    // 检索相关记忆
     const memories = this.memory.retrieve(goal);
-    
-    // 获取可用技能
     const skills = this.skillLoader.getAvailableSkills();
     const tools = this.mcp.getAvailableTools();
 
-    // 构建任务步骤（简化版：直接生成步骤）
     const steps: TaskStep[] = this.generateSteps(goal, skills, tools);
 
     const plan: TaskPlan = {
@@ -90,26 +80,19 @@ export class EngineLayer {
   }
 
   private generateSteps(goal: string, skills: string[], tools: string[]): TaskStep[] {
-    // 简单步骤生成逻辑
     const steps: TaskStep[] = [];
-    
-    // 1. 信息收集步骤
     steps.push({
       id: `step-${Date.now()}-1`,
       description: '分析目标并检索相关记忆',
       skill: 'memory-retrieve',
       status: 'pending'
     });
-
-    // 2. 主要执行步骤
     steps.push({
       id: `step-${Date.now()}-2`,
       description: '执行主要任务',
       status: 'pending',
       dependencies: ['step-1']
     });
-
-    // 3. 验证与复盘步骤
     steps.push({
       id: `step-${Date.now()}-3`,
       description: '验证结果并提取经验',
@@ -117,13 +100,9 @@ export class EngineLayer {
       status: 'pending',
       dependencies: ['step-2']
     });
-
     return steps;
   }
 
-  /**
-   * 执行任务计划
-   */
   async executePlan(planId: string): Promise<any> {
     const plan = this.currentPlans.get(planId);
     if (!plan) throw new Error(`Plan ${planId} not found`);
@@ -134,7 +113,6 @@ export class EngineLayer {
     const results: any[] = [];
     for (const step of plan.steps) {
       if (step.status === 'done') continue;
-      // 检查依赖
       if (step.dependencies) {
         const depsDone = step.dependencies.every(depId => {
           const dep = plan.steps.find(s => s.id === depId);
@@ -158,15 +136,11 @@ export class EngineLayer {
 
     plan.status = 'completed';
     this.events.next({ type: 'plan-completed', planId, results });
-    
-    // 自动复盘
     await this.selfEvolve(plan, results);
-    
     return results;
   }
 
   private async executeStep(step: TaskStep, plan: TaskPlan): Promise<any> {
-    // 根据步骤描述选择执行方式
     if (step.skill) {
       const skill = this.skillLoader.getSkill(step.skill);
       if (skill) {
@@ -179,15 +153,10 @@ export class EngineLayer {
         return await tool.execute(step.parameters || {});
       }
     }
-    // 通用执行：模拟
     return { step: step.id, status: 'done', result: 'executed' };
   }
 
-  /**
-   * 自我进化：复盘并提取经验
-   */
   private async selfEvolve(plan: TaskPlan, results: any[]) {
-    // 提取经验并写入记忆
     const experience = {
       goal: plan.goal,
       success: plan.status === 'completed',
@@ -203,16 +172,10 @@ export class EngineLayer {
     console.log(`📚 自我进化: ${plan.id} 已复盘并存储经验`);
   }
 
-  /**
-   * 获取所有计划
-   */
   getPlans(): TaskPlan[] {
     return Array.from(this.currentPlans.values());
   }
 
-  /**
-   * 获取计划状态
-   */
   getPlanStatus(planId: string): TaskPlan | undefined {
     return this.currentPlans.get(planId);
   }

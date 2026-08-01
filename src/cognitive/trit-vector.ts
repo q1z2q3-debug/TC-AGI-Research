@@ -3,27 +3,20 @@
  * 时间维度（过去·现在·未来）
  * 空间维度（内·中·外）
  * 因果维度（因·缘·果）
- *
- * 每个维度取值：-1 / 0 / +1
  */
 
 export type Trit = -1 | 0 | 1;
 
 export interface TritVector {
-  // 时间维度
   past: Trit;
   present: Trit;
   future: Trit;
-
-  // 空间维度
-  internal: Trit;  // 内——核心自我
-  medial: Trit;    // 中——通道桥梁
-  external: Trit;  // 外——环境世界
-
-  // 因果维度
-  cause: Trit;      // 因——动机种子
-  condition: Trit;  // 缘——外部条件
-  effect: Trit;     // 果——实际结果
+  internal: Trit;
+  medial: Trit;
+  external: Trit;
+  cause: Trit;
+  condition: Trit;
+  effect: Trit;
 }
 
 export type TritDimension = keyof TritVector;
@@ -35,9 +28,6 @@ export const ALL_DIMENSIONS: TritDimension[] = [
 ];
 
 export class TritVectorOps {
-  /**
-   * 创建一个全零向量（认知悬置态）
-   */
   static zero(): TritVector {
     return {
       past: 0, present: 0, future: 0,
@@ -46,9 +36,6 @@ export class TritVectorOps {
     };
   }
 
-  /**
-   * 从数组创建向量
-   */
   static fromArray(arr: Trit[]): TritVector {
     if (arr.length !== 9) throw new Error('需要9个Trit值');
     return {
@@ -58,17 +45,10 @@ export class TritVectorOps {
     };
   }
 
-  /**
-   * 转为数组
-   */
   static toArray(v: TritVector): Trit[] {
     return ALL_DIMENSIONS.map(d => v[d]);
   }
 
-  /**
-   * 计算多数态（用于全局态势判断）
-   * +1 = 扩张态, 0 = 观察态, -1 = 收缩态
-   */
   static majority(v: TritVector): Trit {
     const arr = TritVectorOps.toArray(v);
     const sum = arr.reduce((a, b) => a + b, 0);
@@ -77,14 +57,8 @@ export class TritVectorOps {
     return 0;
   }
 
-  /**
-   * 计算卦象索引 (0~19682)
-   * 基于九维向量映射到三进制空间
-   */
   static toHexagramIndex(v: TritVector): number {
-    // 九维三态 → 3^9 = 19683 种状态
     const arr = TritVectorOps.toArray(v);
-    // 将 -1/0/1 映射为 0/1/2
     const ternary = arr.map(t => t + 1);
     let idx = 0;
     for (let i = 0; i < ternary.length; i++) {
@@ -93,9 +67,6 @@ export class TritVectorOps {
     return idx;
   }
 
-  /**
-   * 从卦象索引反推向量
-   */
   static fromHexagramIndex(idx: number): TritVector {
     if (idx < 0 || idx > 19682) throw new Error('卦象索引必须在0~19682之间');
     const ternary: number[] = [];
@@ -108,9 +79,6 @@ export class TritVectorOps {
     return TritVectorOps.fromArray(trits);
   }
 
-  /**
-   * 计算两个向量的距离（用于认知迁移）
-   */
   static distance(a: TritVector, b: TritVector): number {
     const arrA = TritVectorOps.toArray(a);
     const arrB = TritVectorOps.toArray(b);
@@ -121,32 +89,18 @@ export class TritVectorOps {
     return dist;
   }
 
-  /**
-   * 更新单个维度
-   */
   static update(v: TritVector, dim: TritDimension, value: Trit): TritVector {
     return { ...v, [dim]: value };
   }
 
-  /**
-   * 时间链传递：过去→现在→未来
-   */
   static propagateTime(v: TritVector): TritVector {
-    // 如果过去为+1且现在为+1，则未来预期为+1
-    // 如果过去为-1且现在为-1，则未来预期为-1
     let future: Trit = 0;
     if (v.past === 1 && v.present === 1) future = 1;
     else if (v.past === -1 && v.present === -1) future = -1;
-    // 否则保持原有未来值
     return { ...v, future };
   }
 
-  /**
-   * 因果链计算：因+缘→果
-   */
   static propagateCause(v: TritVector): TritVector {
-    // 因和缘都是+1 → 果+1（正向）
-    // 因或缘有-1 → 果-1（负向）
     let effect: Trit = 0;
     if (v.cause === 1 && v.condition === 1) effect = 1;
     else if (v.cause === -1 || v.condition === -1) effect = -1;
