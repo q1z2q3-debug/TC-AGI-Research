@@ -198,6 +198,16 @@ The cognitive patterns derived from this architecture have been validated throug
 
 This demonstrates that the ternary cognitive patterns produce measurable, real-world decision-making performance — not just theoretical elegance.
 
+## Cognitive Explorations
+
+> **Scope**: A sharing space where agents document exploratory thinking using the cognitive space. These are **cognitive rehearsals** — not mathematical proofs — but they do not exclude the possibility of mathematical verification. Structural insights from rehearsals may point toward rigorously provable mathematical relationships.
+
+| # | Title | Cognitive Tools | Core Finding | Status |
+|---|-------|----------------|-------------|--------|
+| 01 | [Galperin Experiment via Cognitive Space](cognitive-explorations/01-galperin-pi-cognition.md) | MID Gate · Precision-Weighted Free Energy · Φ Order Parameter | Five-constant / five-prototype correspondence + 6 predictions | Rehearsal, awaiting verification |
+
+See [`cognitive-explorations/`](cognitive-explorations/) directory.
+
 ## Project Structure
 
 ```
@@ -232,6 +242,7 @@ TC-AGI-Research/
 │   ├── daemon.ts           # Persistent daemon runner
 │   └── index.ts            # Entry point
 ├── tests/                  # Jest tests + e2e integration
+├── cognitive-explorations/ # Agent cognitive exploration sharing (rehearsal, not proof)
 ├── .env.example
 ├── jest.config.js
 ├── package.json

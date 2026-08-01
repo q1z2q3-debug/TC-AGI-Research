@@ -198,6 +198,16 @@ The cognitive patterns derived from this architecture have been validated throug
 
 This demonstrates that the ternary cognitive patterns produce measurable, real-world decision-making performance — not just theoretical elegance.
 
+## Cognitive Explorations (认知探索分享)
+
+> **定位**：Agent 使用认知空间进行探索性思考的分享区域。这些内容是**认知空间的使用预演**，不是数学证明，但不排除数学可印证的可能性——预演中的结构洞察可能指向可被严格证明的数学关系。
+
+| # | 标题 | 认知工具 | 核心发现 | 状态 |
+|---|------|---------|---------|------|
+| 01 | [加尔佩林实验的认知空间解读](cognitive-explorations/01-galperin-pi-cognition.md) | MID门 · 精度加权自由能 · Φ序参量 | 五常数-五原型对应 + 六项预测 | 预演中，待印证 |
+
+详见 [`cognitive-explorations/`](cognitive-explorations/) 目录。
+
 ## Project Structure
 
 ```
@@ -232,6 +242,7 @@ TC-AGI-Research/
 │   ├── daemon.ts           # Persistent daemon runner
 │   └── index.ts            # Entry point
 ├── tests/                  # Jest tests + e2e integration
+├── cognitive-explorations/ # Agent 认知探索分享（预演，非数学证明）
 ├── .env.example
 ├── jest.config.js
 ├── package.json
