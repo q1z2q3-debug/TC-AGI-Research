@@ -12,13 +12,15 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 /**
- * 隔离记忆持久化：MemoryStore 默认写入 ~/.tc-agi-memory.json。
- * 每个测试把 HOME 指到一个全新临时目录，避免跨测试/跨运行的记忆泄漏，
- * 也避免污染用户真实 home。
+ * 隔离记忆持久化：MemoryStore 现在使用 MEMORY_PATH 或 process.cwd()/data/memory.json。
+ * 每个测试把 MEMORY_PATH 指向一个全新临时文件，避免跨测试/跨运行的记忆泄漏，
+ * 也避免污染项目 data/ 目录。
  */
 beforeEach(() => {
-  process.env.HOME = mkdtempSync(join(tmpdir(), 'tc-agi-test-'));
-  process.env.USERPROFILE = process.env.HOME;
+  const tmpDir = mkdtempSync(join(tmpdir(), 'tc-agi-test-'));
+  process.env.MEMORY_PATH = join(tmpDir, 'memory.json');
+  process.env.HOME = tmpDir;
+  process.env.USERPROFILE = tmpDir;
 });
 
 /**
