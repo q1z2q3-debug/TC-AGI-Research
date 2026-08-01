@@ -2,11 +2,16 @@
  * 三元索引记忆系统 (Memory System)
  * 基于 卦象索引(0~19682) + π展开深度(1~10) + e呼吸相位(权重)
  * 实现长期记忆的存储、检索、遗忘与进化
+ *
+ * 升级：检索算法从"关键词匹配 + 卦象索引线性差"升级为
+ *      "关键词匹配 + 三元认知距离（复合距离）+ 时间衰减 + 重要性"多维融合评分。
  */
 
 import { MemoryStore } from './memory-store';
 import { v4 as uuidv4 } from 'uuid';
-import { contentHexagram } from '../cognitive/semantic';
+import { contentHexagram, contentToTritVector } from '../cognitive/semantic';
+import { CognitiveDistance } from '../cognitive/distance';
+import { TritVector, TritVectorOps } from '../cognitive/trit-vector';
 
 export interface Memory {
   id: string;
@@ -15,6 +20,8 @@ export interface Memory {
   content: string;
   tags: string[];
   hexagramIndex: number;
+  /** 认知向量（用于三元距离检索） */
+  tritVector: TritVector;
   piDepth: number;
   eWeight: number;
   timestamp: number;
@@ -46,6 +53,21 @@ export class MemorySystem {
     if (this.initialized) return;
     await this.store.initialize();
     this.memories = await this.store.loadAll();
+
+    // 迁移：为旧记忆补充 tritVector 字段（向后兼容）
+    let migrated = 0;
+    for (const m of this.memories) {
+      if (!m.tritVector) {
+        m.tritVector = contentToTritVector(m.content);
+        migrated++;
+      }
+    }
+    if (migrated > 0) {
+      console.log(`🔄 记忆迁移: 为 ${migrated} 条旧记忆补充认知向量`);
+      // 持久化迁移结果
+      await this.store.saveAll(this.memories);
+    }
+
     this.initialized = true;
     console.log(`🧠 记忆系统初始化: ${this.memories.length} 条记忆`);
   }
@@ -53,12 +75,14 @@ export class MemorySystem {
   /**
    * 保存记忆
    */
-  async save(memory: Omit<Memory, 'id' | 'hexagramIndex' | 'piDepth' | 'eWeight' | 'timestamp' | 'accessCount' | 'lastAccess' | 'importance'>): Promise<Memory> {
+  async save(memory: Omit<Memory, 'id' | 'hexagramIndex' | 'tritVector' | 'piDepth' | 'eWeight' | 'timestamp' | 'accessCount' | 'lastAccess' | 'importance'>): Promise<Memory> {
     await this.ensureInitialized();
 
+    const tritVector = contentToTritVector(memory.content);
     const fullMemory: Memory = {
       id: uuidv4(),
       ...memory,
+      tritVector,
       hexagramIndex: this.calcHexagramIndex(memory.content),
       piDepth: this.calcPiDepth(memory.content),
       eWeight: this.calcEWeight(memory.content),
@@ -100,40 +124,73 @@ export class MemorySystem {
   }
 
   /**
-   * 检索记忆
+   * 检索记忆（三元距离检索）
+   *
+   * 升级：从"关键词匹配 + 卦象索引线性差"升级为多维融合评分：
+   *   1. 关键词匹配（文本相关度）     权重: 0.25
+   *   2. 三元认知距离（复合距离倒数）  权重: 0.35  ← 核心升级
+   *   3. e活性 × 时间衰减             权重: 0.15
+   *   4. 访问频率                     权重: 0.10
+   *   5. 重要性                       权重: 0.15
+   *
+   * 三元认知距离使用 CognitiveDistance.composite()，
+   * 融合 Hamming/Manhattan/Euclidean/Cosine 四种距离度量，
+   * 比原先的卦象索引线性差更准确地捕捉语义相似性。
    */
   retrieve(query: string, limit: number = 10, type?: Memory['type']): Memory[] {
-    // 先使用简单关键词匹配，后续可升级为embedding
+    // 关键词匹配
     const queryLower = query.toLowerCase();
     const keywords = queryLower.split(/\s+/).filter(w => w.length > 2);
 
+    // 查询的认知向量（用于三元距离计算）
+    const queryVector = contentToTritVector(query);
+
     let scored = this.memories.map(m => {
-      let score = 0;
+      // ── 1. 关键词匹配 ──
+      let keywordScore = 0;
       const contentLower = m.content.toLowerCase();
       const nameLower = m.name.toLowerCase();
       const tagMatch = m.tags.some(t => keywords.some(k => t.toLowerCase().includes(k)));
 
       for (const keyword of keywords) {
-        if (contentLower.includes(keyword)) score += 3;
-        if (nameLower.includes(keyword)) score += 2;
-        if (tagMatch) score += 1;
+        if (contentLower.includes(keyword)) keywordScore += 3;
+        if (nameLower.includes(keyword)) keywordScore += 2;
+        if (tagMatch) keywordScore += 1;
       }
+      // 归一化关键词分数到 0~1
+      const keywordNorm = keywords.length > 0
+        ? Math.min(1, keywordScore / (keywords.length * 6))
+        : 0;
 
-      // 卦象相似度
-      const queryHex = this.calcHexagramIndex(query);
-      const hexScore = 1 - Math.abs(m.hexagramIndex - queryHex) / 19682;
-      score += hexScore * 0.5;
+      // ── 2. 三元认知距离（核心升级）──
+      // 使用复合距离（Hamming+Manhattan+Euclidean+Cosine 融合）
+      // 距离越小 → 相似度越高
+      const compositeDist = CognitiveDistance.composite(queryVector, m.tritVector);
+      const cognitiveSimilarity = 1 - compositeDist; // 0~1，1=完全相似
 
-      // e活性权重
+      // 同时计算加权距离作为补充信号
+      const weightedDist = CognitiveDistance.weightedNormalized(queryVector, m.tritVector);
+      const weightedSimilarity = 1 - weightedDist;
+
+      // 融合两种距离的相似度
+      const distScore = 0.7 * cognitiveSimilarity + 0.3 * weightedSimilarity;
+
+      // ── 3. e活性 × 时间衰减 ──
       const eScore = m.eWeight * this.calcDecay(m.timestamp);
-      score += eScore * 0.3;
 
-      // 访问频率
-      const accessBoost = Math.min(1, m.accessCount / 10) * 0.2;
-      score += accessBoost;
+      // ── 4. 访问频率 ──
+      const accessBoost = Math.min(1, m.accessCount / 10);
 
-      // 重要性
-      score += m.importance * 0.3;
+      // ── 5. 重要性 ──
+      const importanceScore = m.importance;
+
+      // ── 多维融合评分 ──
+      const score =
+        keywordNorm * 0.25 +
+        distScore * 0.35 +
+        eScore * 0.15 +
+        accessBoost * 0.10 +
+        importanceScore * 0.15;
 
       return { memory: m, score };
     });
@@ -223,25 +280,44 @@ export class MemorySystem {
 
   /**
    * 查找相似记忆（去重）
+   *
+   * 升级：从 Jaccard 词汇距离升级为三元认知距离（复合距离）。
+   *      当新记忆与已有记忆的认知距离 < 0.2（即相似度 > 0.8）时视为重复。
    */
   private findSimilar(memory: Memory): Memory | null {
-    const threshold = 0.8;
+    const threshold = 0.2; // 复合距离阈值，小于此值视为相似
     for (const existing of this.memories) {
       if (existing.type !== memory.type) continue;
-      const dist = this.calcDistance(memory.content, existing.content);
-      if (dist < 1 - threshold) {
+      const dist = CognitiveDistance.composite(memory.tritVector, existing.tritVector);
+      if (dist < threshold) {
         return existing;
       }
     }
     return null;
   }
 
-  private calcDistance(a: string, b: string): number {
-    const wordsA = new Set(a.toLowerCase().split(/\s+/));
-    const wordsB = new Set(b.toLowerCase().split(/\s+/));
-    const intersection = new Set([...wordsA].filter(w => wordsB.has(w)));
-    const union = new Set([...wordsA, ...wordsB]);
-    return 1 - intersection.size / union.size;
+  /**
+   * 按认知向量检索记忆（三元距离检索的向量版）
+   *
+   * 直接使用认知向量进行距离计算，无需文本关键词。
+   * 适用于认知空间内部的状态迁移参考。
+   */
+  retrieveByVector(
+    vector: TritVector,
+    limit: number = 10,
+    type?: Memory['type']
+  ): { memory: Memory; distance: number; similarity: number }[] {
+    let scored = this.memories.map(m => {
+      const dist = CognitiveDistance.composite(vector, m.tritVector);
+      return { memory: m, distance: dist, similarity: 1 - dist };
+    });
+
+    if (type) {
+      scored = scored.filter(s => s.memory.type === type);
+    }
+
+    scored.sort((a, b) => a.distance - b.distance);
+    return scored.slice(0, limit);
   }
 
   /**

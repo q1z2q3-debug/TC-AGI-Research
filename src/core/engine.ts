@@ -11,6 +11,9 @@ import { SkillLoader, SkillMatch } from '../skills/skill-loader';
 import { MCPAdapter, ToolMatch } from '../tools/mcp-adapter';
 import { CronScheduler } from '../scheduler/cron-scheduler';
 import { LLMProvider } from '../cognitive/llm';
+import { NullEngine } from '../cognitive/null-engine';
+import { ActiveInference, CognitiveAction } from '../cognitive/active-inference';
+import { PrototypeMatcher } from '../cognitive/prototypes';
 import { Subject } from 'rxjs';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -99,6 +102,7 @@ export class EngineLayer {
   private runningPlans: Set<string> = new Set();
   private readonly MAX_RETRIES = 3;
   private llm: LLMProvider | null = null;
+  private nullEngine: NullEngine | null = null;
 
   constructor(
     ideology: IdeologyLayer,
@@ -117,7 +121,18 @@ export class EngineLayer {
   }
 
   async initialize() {
-    console.log('⚙️ 研究引擎层初始化完成');
+    // 初始化空引擎（技能创造闭环）
+    this.nullEngine = new NullEngine({
+      registerSkill: (skill) => this.skillLoader.registerSkill(skill),
+      hasSkill: (name) => this.skillLoader.getSkill(name) !== undefined,
+      saveMemory: async (memory) => this.memory.save(memory),
+      retrieveMemory: (query, limit) => this.memory.retrieve(query, limit || 5),
+      llmComplete: this.llm
+        ? (sys, user) => this.llm!.complete(sys, user)
+        : undefined
+    });
+
+    console.log('⚙️ 研究引擎层初始化完成（含空引擎·技能创造闭环）');
     this.events.next({ type: 'engine-ready' });
   }
 
@@ -170,11 +185,16 @@ export class EngineLayer {
 
   /**
    * 基于认知状态派生策略
+   *
+   * 升级：集成主动推理引擎（Active Inference），
+   *      通过自由能最小化选择最优认知行动，
+   *      而非仅依靠简单的多数态判断。
    */
   private deriveStrategy(state: any): any {
     const majority = state.vector ? this.getMajority(state.vector) : 0;
     const snapshot = this.cognitive.getSnapshot();
 
+    // 基础策略（保留原有逻辑作为回退）
     let strategy: any = {
       name: '平衡策略',
       mode: 'observe',
@@ -214,6 +234,44 @@ export class EngineLayer {
       strategy.confidence = Math.min(1, (strategy.confidence || 0.5) + 0.15);
     }
 
+    // ═══ 主动推理增强 ═══
+    // 使用主动推理引擎选择最优认知行动
+    try {
+      const history = this.cognitive.getHistory().map(h => h.vector);
+      const inference = ActiveInference.infer(state.vector, history, {
+        freeEnergyThreshold: 0.1,
+        transitionPenalty: 0.1,
+        useHistory: history.length >= 2
+      });
+
+      // 如果主动推理建议的行动与基础策略不同，且自由能改善显著，则采纳
+      if (inference.bestAction !== 'hold' &&
+          inference.freeEnergyReduction > 0.05 &&
+          inference.confidence > 0.5) {
+        const actionToMode: Record<CognitiveAction, string> = {
+          expand: 'expand',
+          contract: 'contract',
+          observe: 'observe',
+          transform: 'observe',  // 转化映射为观察（需要特殊处理）
+          create: 'expand',      // 创生映射为扩张
+          hold: 'observe'
+        };
+        const inferredMode = actionToMode[inference.bestAction];
+        if (inferredMode !== strategy.mode) {
+          strategy.inferredAction = inference.bestAction;
+          strategy.inferenceConfidence = inference.confidence;
+          strategy.freeEnergyReduction = inference.freeEnergyReduction;
+          strategy.targetPrototype = inference.targetPrototype.name;
+        }
+      }
+
+      // 添加原型推荐
+      const recommendation = PrototypeMatcher.recommendAction(state.vector);
+      strategy.prototypeRecommendation = recommendation;
+    } catch {
+      // 主动推理失败不影响基础策略
+    }
+
     return strategy;
   }
 
@@ -233,6 +291,10 @@ export class EngineLayer {
 
   /**
    * 生成任务步骤
+   *
+   * 修复：原先步骤 ID 使用 `step-${Date.now()}-N` 但依赖引用 `['step-1']` 等不匹配的字符串，
+   *      导致 executePlan 中依赖检查永远失败，后续步骤被静默跳过。
+   *      现改为先生成完整 ID 数组，再以数组索引引用依赖，确保 ID 一致。
    */
   private generateSteps(
     goal: string,
@@ -243,10 +305,14 @@ export class EngineLayer {
   ): TaskStep[] {
     const steps: TaskStep[] = [];
     const mode = strategy.mode || 'observe';
+    const baseTime = Date.now();
+
+    // 预生成四个步骤的 ID，确保依赖引用一致
+    const stepIds = [1, 2, 3, 4].map(n => `step-${baseTime}-${n}`);
 
     // 步骤1: 认知定位（总是第一步）
     steps.push({
-      id: `step-${Date.now()}-1`,
+      id: stepIds[0],
       description: '认知定位与态势感知',
       skill: 'self-evolve',
       parameters: { action: 'perceive', goal },
@@ -257,11 +323,11 @@ export class EngineLayer {
 
     // 步骤2: 信息检索
     steps.push({
-      id: `step-${Date.now()}-2`,
+      id: stepIds[1],
       description: '检索相关记忆与知识',
       skill: 'memory-retrieve',
       parameters: { query: goal, limit: 5 },
-      dependencies: ['step-1'],
+      dependencies: [stepIds[0]],
       status: 'pending',
       retries: 0,
       maxRetries: 2
@@ -271,30 +337,30 @@ export class EngineLayer {
     let mainStep: TaskStep;
     if (mode === 'expand') {
       mainStep = {
-        id: `step-${Date.now()}-3`,
+        id: stepIds[2],
         description: `主动执行: ${goal}`,
         parameters: { goal, strategy, mode: 'expand' },
-        dependencies: ['step-2'],
+        dependencies: [stepIds[1]],
         status: 'pending',
         retries: 0,
         maxRetries: this.MAX_RETRIES
       };
     } else if (mode === 'contract') {
       mainStep = {
-        id: `step-${Date.now()}-3`,
+        id: stepIds[2],
         description: `收缩聚焦: ${goal}`,
         parameters: { goal, strategy, mode: 'contract' },
-        dependencies: ['step-2'],
+        dependencies: [stepIds[1]],
         status: 'pending',
         retries: 0,
         maxRetries: this.MAX_RETRIES
       };
     } else {
       mainStep = {
-        id: `step-${Date.now()}-3`,
+        id: stepIds[2],
         description: `观察学习: ${goal}`,
         parameters: { goal, strategy, mode: 'observe' },
-        dependencies: ['step-2'],
+        dependencies: [stepIds[1]],
         status: 'pending',
         retries: 0,
         maxRetries: this.MAX_RETRIES
@@ -316,11 +382,11 @@ export class EngineLayer {
 
     // 步骤4: 验证与复盘
     steps.push({
-      id: `step-${Date.now()}-4`,
+      id: stepIds[3],
       description: '验证结果并提取经验',
       skill: 'self-evolve',
       parameters: { action: 'evolve' },
-      dependencies: ['step-3'],
+      dependencies: [stepIds[2]],
       status: 'pending',
       retries: 0,
       maxRetries: 1
@@ -426,24 +492,50 @@ export class EngineLayer {
     };
   }
 
+  /**
+   * 执行单个步骤
+   *
+   * 修复：原先当 step.skill 指定但技能不存在时，静默落入通用执行并返回"成功"，
+   *      导致失败被掩盖、复盘无意义。现改为：
+   *      1. 技能不存在时尝试通过空引擎创造（技能创造闭环）
+   *      2. 创造失败则抛出明确错误（触发重试与归因）
+   *      3. 工具不存在时同理（抛出错误）
+   *      4. 仅当未指定 skill/tool 时才走通用执行
+   */
   private async executeStep(step: TaskStep, plan: TaskPlan): Promise<any> {
     // 如果有skill，执行skill
     if (step.skill) {
       const skill = this.skillLoader.getSkill(step.skill);
-      if (skill) {
-        return await skill.execute(step.parameters || {});
+      if (!skill) {
+        // 尝试通过空引擎创造技能
+        if (this.nullEngine) {
+          console.log(`🔮 技能 "${step.skill}" 不存在，启动空引擎创造...`);
+          const creation = await this.nullEngine.createSkill({
+            missingSkillName: step.skill,
+            goal: plan.goal,
+            stepDescription: step.description,
+            parameters: step.parameters
+          });
+          if (creation.success && creation.skill) {
+            this.events.next({ type: 'skill-created', skillName: step.skill, planId: plan.id });
+            return await creation.skill.execute(step.parameters || {});
+          }
+        }
+        throw new Error(`技能 "${step.skill}" 未注册且空引擎创造失败，无法执行步骤: ${step.description}`);
       }
+      return await skill.execute(step.parameters || {});
     }
 
     // 如果有tool，执行tool
     if (step.tool) {
       const tool = this.mcp.getTool(step.tool);
-      if (tool) {
-        return await tool.execute(step.parameters || {});
+      if (!tool) {
+        throw new Error(`工具 "${step.tool}" 未注册，无法执行步骤: ${step.description}`);
       }
+      return await tool.execute(step.parameters || {});
     }
 
-    // 通用执行
+    // 通用执行（仅当未指定 skill/tool 时）
     return { step: step.id, status: 'done', result: `executed: ${step.description}`, timestamp: new Date() };
   }
 

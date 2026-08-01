@@ -77,9 +77,16 @@ export class TritVectorOps {
   }
 
   /**
-   * 距离（用于认知迁移）
+   * 曼哈顿距离（L1）：每维差的绝对值之和
+   * 注意：这是原先被命名为 `distance` 的方法，实际计算的是曼哈顿距离。
+   * 保留向后兼容别名，新代码请使用 CognitiveDistance.manhattan。
    */
   static distance(a: TritVector, b: TritVector): number {
+    return TritVectorOps.manhattanDistance(a, b);
+  }
+
+  /** 曼哈顿距离（L1）：每维 |a-b| 之和，范围 0~18 */
+  static manhattanDistance(a: TritVector, b: TritVector): number {
     const arrA = TritVectorOps.toArray(a);
     const arrB = TritVectorOps.toArray(b);
     let dist = 0;
@@ -87,6 +94,36 @@ export class TritVectorOps {
       dist += Math.abs(arrA[i] - arrB[i]);
     }
     return dist;
+  }
+
+  /** 汉明距离：有几个维度不同，范围 0~9 */
+  static hammingDistance(a: TritVector, b: TritVector): number {
+    return ALL_DIMENSIONS.filter(d => a[d] !== b[d]).length;
+  }
+
+  /** 欧式距离（L2）：考虑阴阳对立比阴到和更远 */
+  static euclideanDistance(a: TritVector, b: TritVector): number {
+    const arrA = TritVectorOps.toArray(a);
+    const arrB = TritVectorOps.toArray(b);
+    let sumSq = 0;
+    for (let i = 0; i < 9; i++) {
+      sumSq += Math.pow(arrA[i] - arrB[i], 2);
+    }
+    return Math.sqrt(sumSq);
+  }
+
+  /** 余弦相似度：方向是否一致，范围 -1~1 */
+  static cosineSimilarity(a: TritVector, b: TritVector): number {
+    const arrA = TritVectorOps.toArray(a);
+    const arrB = TritVectorOps.toArray(b);
+    let dot = 0, normA = 0, normB = 0;
+    for (let i = 0; i < 9; i++) {
+      dot += arrA[i] * arrB[i];
+      normA += arrA[i] * arrA[i];
+      normB += arrB[i] * arrB[i];
+    }
+    if (normA === 0 || normB === 0) return 0;
+    return dot / (Math.sqrt(normA) * Math.sqrt(normB));
   }
 
   /**
