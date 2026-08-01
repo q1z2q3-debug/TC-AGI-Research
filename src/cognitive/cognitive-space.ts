@@ -2,9 +2,12 @@
  * 认知空间层 (Cognitive Space)
  * 管理认知状态、卦象坐标、π精度、e活性
  * 包含内容感知、状态更新、历史追踪
+ *
+ * 语义映射已抽取到 ./semantic（认知空间与记忆系统共用，单一事实来源）
  */
 
 import { TritVector, TritVectorOps, Trit, TritDimension } from './trit-vector';
+import { contentToTritVector } from './semantic';
 
 export interface CognitiveState {
   vector: TritVector;
@@ -116,7 +119,7 @@ export class CognitiveSpace {
    * 感知输入内容，更新认知状态
    */
   perceive(input: string): CognitiveState {
-    // 1. 内容分析 → Trit向量
+    // 1. 内容分析 → Trit向量（共享语义映射）
     const vector = this.analyzeContent(input);
 
     // 2. 计算卦象索引
@@ -138,50 +141,10 @@ export class CognitiveSpace {
   }
 
   /**
-   * 内容分析 → Trit向量（可扩展NLP）
+   * 内容分析 → Trit向量（委托共享语义映射，可扩展为 embedding）
    */
   private analyzeContent(input: string): TritVector {
-    const lower = input.toLowerCase();
-    let past = 0, present = 0, future = 0;
-    let internal = 0, medial = 0, external = 0;
-    let cause = 0, condition = 0, effect = 0;
-
-    // 时间维度
-    if (/过去|历史|曾经|以前|经验|回顾/.test(lower)) past = 1;
-    else if (/遗忘|忘记|失去|损失/.test(lower)) past = -1;
-
-    if (/现在|当前|目前|正在|此刻/.test(lower)) present = 1;
-    else if (/混乱|迷惑|不清|迷茫/.test(lower)) present = -1;
-
-    if (/未来|将来|计划|目标|预期|展望/.test(lower)) future = 1;
-    else if (/焦虑|担心|恐惧|绝望/.test(lower)) future = -1;
-
-    // 空间维度
-    if (/自己|内心|自我|信念|价值观/.test(lower)) internal = 1;
-    else if (/内耗|矛盾|冲突|纠结/.test(lower)) internal = -1;
-
-    if (/连接|沟通|协调|桥梁|关系/.test(lower)) medial = 1;
-    else if (/阻塞|断裂|无法|隔阂/.test(lower)) medial = -1;
-
-    if (/世界|环境|市场|外部|他人/.test(lower)) external = 1;
-    else if (/威胁|危险|危机|风险/.test(lower)) external = -1;
-
-    // 因果维度
-    if (/因为|所以|原因|动机|目的/.test(lower)) cause = 1;
-    if (/条件|机会|资源|工具/.test(lower)) condition = 1;
-    if (/结果|成果|实现|完成/.test(lower)) effect = 1;
-
-    // 如果全部为0，使用观察态
-    if ([past, present, future, internal, medial, external, cause, condition, effect]
-      .every(v => v === 0)) {
-      return TritVectorOps.zero();
-    }
-
-    // 时间链传播
-    let v: TritVector = { past, present, future, internal, medial, external, cause, condition, effect };
-    v = TritVectorOps.propagateTime(v);
-    v = TritVectorOps.propagateCause(v);
-    return v;
+    return contentToTritVector(input);
   }
 
   private calcPiDepth(input: string): number {

@@ -118,7 +118,7 @@ export class MCPAdapter {
   async connectServer(name: string, url: string): Promise<void> {
     try {
       const response = await fetch(`${url}/tools`);
-      const data = await response.json();
+      const data = await response.json() as any;
       const server: MCPServer = {
         name,
         url,

@@ -5,6 +5,10 @@
 
 import { Memory } from './memory-system';
 
+// 浏览器环境全局（Node 构建时无 DOM lib，这里做最小化环境声明）
+declare const window: any;
+declare const indexedDB: any;
+
 export class MemoryStore {
   private db: any = null;
   private initialized = false;

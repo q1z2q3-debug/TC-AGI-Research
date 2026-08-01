@@ -42,7 +42,7 @@ export class SkillLoader {
         try {
           // 使用内置 fetch 或模拟
           const response = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json`);
-          const data = await response.json();
+          const data = await response.json() as any;
           return { results: data.RelatedTopics || [], query };
         } catch (e) {
           return { error: String(e), query, fallback: '请检查网络连接' };

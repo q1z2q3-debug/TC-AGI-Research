@@ -47,7 +47,7 @@ export class TritVectorOps {
    * 多数态：+1=扩张，0=观察，-1=收缩
    */
   static majority(v: TritVector): Trit {
-    const sum = TritVectorOps.toArray(v).reduce((a, b) => a + b, 0);
+    const sum = TritVectorOps.toArray(v).reduce<number>((a, b) => a + b, 0);
     if (sum > 1) return 1;
     if (sum < -1) return -1;
     return 0;

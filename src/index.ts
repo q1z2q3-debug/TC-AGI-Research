@@ -7,8 +7,8 @@
  */
 
 // 核心导出
-export { TCAGI4, getAGI, startAGI } from './integration';
-export type { AGIHealthStatus } from './integration';
+export { TCAGI4, startAGI, runTask } from './integration';
+export type { HealthStatus } from './types';
 
 // 认知层导出
 export * from './cognitive';
@@ -17,11 +17,11 @@ export type { ActionStrategy, TaskResult } from './cognitive/deepseek-cognize';
 
 // 记忆层导出
 export * from './memory';
-export type { Memory, MemoryQuery, MemoryStats } from './memory/memory-types';
+export type { MemoryQuery, MemoryStats } from './memory/memory-types';
 
 // 核心层导出
 export * from './core';
-export type { TaskPlan, TaskStep, EngineEvent } from './core/engine';
+export type { TaskPlan, TaskStep, ExecutionResult } from './core/engine';
 
 // 技能层导出
 export * from './skills';
@@ -33,7 +33,7 @@ export type { MCPTool, MCPServer } from './tools/mcp-adapter';
 
 // 调度器导出
 export * from './scheduler';
-export type { ScheduledTask, TaskSchedule } from './scheduler/cron-scheduler';
+export type { ScheduledTask, TaskExecution } from './scheduler/cron-scheduler';
 
 // 类型导出
 export * from './types';

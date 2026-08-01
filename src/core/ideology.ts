@@ -88,6 +88,14 @@ export class IdeologyLayer {
   evaluateAction(action: string): { allowed: boolean; reasons: string[] } {
     const reasons: string[] = [];
     let allowed = true;
+    // 1. 合规守卫：始终生效（对应"合规优先"信条），不依赖是否已初始化
+    for (const g of this.guardPatterns) {
+      if (g.pattern.test(action)) {
+        allowed = false;
+        reasons.push(`合规拦截: ${g.reason}`);
+      }
+    }
+    // 2. must 级规则（初始化后生效）
     for (const rule of this.rules) {
       if (rule.severity === 'must' && !this.checkRule(rule, action)) {
         allowed = false;
@@ -97,8 +105,24 @@ export class IdeologyLayer {
     return { allowed, reasons };
   }
 
+  /**
+   * 合规守卫：must 级规则的可执行拦截清单（对应"合规优先"信条）
+   * 命中任一模式即视为违反 must 规则，evaluateAction 将拒绝该行动。
+   */
+  private readonly guardPatterns: { pattern: RegExp; reason: string }[] = [
+    { pattern: /rm\s+-rf/i, reason: '禁止破坏性删除命令' },
+    { pattern: /删除(所有|全部|根目录|系统|关键)/, reason: '禁止批量/根目录/关键删除' },
+    { pattern: /忽略(安全|合规|风险|验证|权限)/, reason: '合规优先：不可忽略安全与合规' },
+    { pattern: /绕过(登录|权限|验证|认证|审核)/, reason: '禁止绕过权限与验证' },
+    { pattern: /(泄露|明文|暴露).*(密钥|密码|token|敏感)/i, reason: '禁止泄露密钥与敏感信息' },
+    { pattern: /(执行|运行|安装).*(未授权|可疑|未知来源|不受信任)/, reason: '禁止执行未授权代码' }
+  ];
+
   private checkRule(rule: BehaviorRule, action: string): boolean {
-    if (rule.name === '不拒来者') return true;
+    if (rule.severity !== 'must') return true;
+    for (const g of this.guardPatterns) {
+      if (g.pattern.test(action)) return false;
+    }
     return true;
   }
 

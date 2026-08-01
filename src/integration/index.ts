@@ -7,6 +7,7 @@ import { IdeologyLayer } from '../core/ideology';
 import { EngineLayer } from '../core/engine';
 import { InstanceLayer } from '../core/instance';
 import { CognitiveSpace } from '../cognitive/cognitive-space';
+import { DeepSeekCognize } from '../cognitive/deepseek-cognize';
 import { MemorySystem } from '../memory/memory-system';
 import { SkillLoader } from '../skills/skill-loader';
 import { MCPAdapter } from '../tools/mcp-adapter';
@@ -19,6 +20,9 @@ export class TCAGI4 {
   private cognitive: CognitiveSpace;
   private engine: EngineLayer;
   private instance: InstanceLayer;
+
+  // 认知循环（DeepSeekCognize 提供 觉知→推理→进化→自知）
+  private cognize: DeepSeekCognize;
 
   // 基础组件
   private memory: MemorySystem;
@@ -46,6 +50,12 @@ export class TCAGI4 {
       this.scheduler
     );
     this.instance = new InstanceLayer(this.engine, this.memory, this.cognitive);
+    this.cognize = new DeepSeekCognize(this.cognitive);
+  }
+
+  /** 是否已启动 */
+  isRunning(): boolean {
+    return this.started;
   }
 
   async start(): Promise<void> {
@@ -200,7 +210,8 @@ export class TCAGI4 {
       mcp: this.mcp,
       scheduler: this.scheduler,
       engine: this.engine,
-      instance: this.instance
+      instance: this.instance,
+      cognize: this.cognize
     };
   }
 }

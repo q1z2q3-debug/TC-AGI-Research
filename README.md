@@ -22,9 +22,10 @@
 - **因果维度**：因·缘·果
 
 ### 3. DeepSeekCognize 认知循环
-- **觉知 (perceive)**：输入 → Trit分解 → 卦象 → π/e调节
+- **觉知 (perceive / perceiveLLM)**：输入 → Trit分解 → 卦象 → π/e调节
+  - 默认本地规则引擎；配置 `DEEPSEEK_API_KEY` 后由 DeepSeek LLM 抽取语义向量（网络异常自动降级）
 - **推理 (reason)**：状态 → 策略派生（扩张/收缩/观察）
-- **进化 (evolve)**：结果反馈 → 向量调整
+- **进化 (evolve)**：结果反馈 → **增量**调整认知向量（只动被结果证实/证伪的维度，避免向量饱和）
 - **自知 (get_state)**：完整态势快照
 
 ### 4. 自我进化机制
@@ -40,13 +41,15 @@
 TC-AGI-Research/
 ├── src/
 │   ├── core/               # 核心层
-│   │   ├── ideology.ts     # 意识形态层
+│   │   ├── ideology.ts     # 意识形态层（含合规守卫）
 │   │   ├── engine.ts       # 研究引擎层
 │   │   └── instance.ts     # 生命体实例层
 │   ├── cognitive/          # 认知空间层
 │   │   ├── trit-vector.ts  # 九维向量运算
 │   │   ├── cognitive-space.ts # 认知空间管理
-│   │   └── deepseek-cognize.ts # 认知循环
+│   │   ├── deepseek-cognize.ts # 认知循环（接真实 LLM）
+│   │   ├── semantic.ts     # 语义坐标映射（认知/记忆共用）
+│   │   └── llm.ts          # DeepSeek 客户端（优雅降级）
 │   ├── memory/             # 记忆系统
 │   │   ├── memory-system.ts
 │   │   └── memory-store.ts
@@ -56,7 +59,11 @@ TC-AGI-Research/
 │   │   └── mcp-adapter.ts
 │   ├── scheduler/          # 定时任务
 │   │   └── cron-scheduler.ts
+│   ├── daemon.ts           # 持久化运行器
 │   └── index.ts            # 入口
+├── tests/                  # Jest 单元测试
+├── .env.example            # 环境变量示例
+├── jest.config.js
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -68,27 +75,49 @@ TC-AGI-Research/
 # 安装依赖
 npm install
 
-# 构建
+# 构建（TypeScript → dist）
 npm run build
 
-# 开发模式
+# 运行单元测试
+npm test
+
+# 启动四元一体 AGI（一次性）
 npm run dev
 
-# 测试
-npm test
+# 持久化运行（固定间隔持续认知循环，支持优雅退出）
+npm run start:daemon
 ```
+
+## 环境变量
+
+复制 `.env.example` 为 `.env` 后填写：
+
+| 变量 | 说明 | 默认 |
+|:----|:-----|:----|
+| `DEEPSEEK_API_KEY` | DeepSeek API 密钥；**留空则用本地规则引擎** | 空 |
+| `DEEPSEEK_BASE_URL` | DeepSeek 端点 | `https://api.deepseek.com` |
+| `DEEPSEEK_MODEL` | 模型名 | `deepseek-chat` |
+| `LOOP_INTERVAL_SEC` | 守护进程循环间隔（秒） | `30` |
+
+> 密钥只从环境变量读取，绝不硬编码进仓库；`.env` 已被 `.gitignore` 忽略。
 
 ## 使用示例
 
 ```typescript
-import { TCAGI } from 'tc-agi-research';
+import { TCAGI4, getDefaultAGI, getCognitiveSnapshot } from 'tc-agi-research';
 
-const agi = new TCAGI();
+const agi = new TCAGI4();
 await agi.start();
 
 // 提交任务
 const result = await agi.submitTask('研究2026年AI Agent的最新趋势');
 console.log(result);
+
+// 直接驱动认知循环（可接入 LLM）
+const cognize = agi.getComponents().cognize;
+cognize.setLLM(/* DeepSeekClient */);
+const cycle = await cognize.cycle('反思最近一次失败，提炼教训');
+console.log(cycle.snapshot);
 
 // 查看认知态势
 const snapshot = agi.getCognitiveSnapshot();

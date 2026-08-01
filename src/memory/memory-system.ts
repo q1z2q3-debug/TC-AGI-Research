@@ -6,6 +6,7 @@
 
 import { MemoryStore } from './memory-store';
 import { v4 as uuidv4 } from 'uuid';
+import { contentHexagram } from '../cognitive/semantic';
 
 export interface Memory {
   id: string;
@@ -243,13 +244,12 @@ export class MemorySystem {
     return 1 - intersection.size / union.size;
   }
 
+  /**
+   * 卦象索引：使用与认知空间一致的"真实语义坐标"，
+   * 取代原先的字符串哈希随机桶（那不是语义坐标）。
+   */
   private calcHexagramIndex(content: string): number {
-    let hash = 0;
-    for (let i = 0; i < content.length; i++) {
-      hash = (hash << 5) - hash + content.charCodeAt(i);
-      hash |= 0;
-    }
-    return Math.abs(hash) % 19683;
+    return contentHexagram(content);
   }
 
   private calcPiDepth(content: string): number {
