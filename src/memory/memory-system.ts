@@ -24,7 +24,7 @@ export interface Memory {
 }
 
 export interface MemoryQuery {
-  query: string;
+  query?: string;
   type?: 'user' | 'feedback' | 'topic' | 'reference';
   tags?: string[];
   limit?: number;

@@ -17,6 +17,16 @@ export interface DeepSeekOptions {
   timeoutMs?: number;
 }
 
+/**
+ * LLM 提供者抽象接口。
+ * 引擎层（失败归因）/ 认知层（觉知）只依赖此接口，便于注入真实 DeepSeekClient，
+ * 也便于在测试中注入 FakeLLM（无需真实密钥与网络）。
+ */
+export interface LLMProvider {
+  /** 给定 system / user 提示，返回模型文本补全（实现方应自行处理超时与错误） */
+  complete(system: string, user: string): Promise<string>;
+}
+
 const SYSTEM_PROMPT = `你是一个认知解析器。给定一段输入文本，请将其映射到九维三元认知向量（每个维度取值 -1 / 0 / 1）：
 - 时间：past(过去) / present(现在) / future(未来)
 - 空间：internal(内) / medial(中) / external(外)
@@ -25,7 +35,7 @@ const SYSTEM_PROMPT = `你是一个认知解析器。给定一段输入文本，
 只输出 JSON，格式严格为：
 {"past":0,"present":1,"future":1,"internal":1,"medial":0,"external":0,"cause":1,"condition":1,"effect":0,"reasoning":"一句话理由"}`;
 
-export class DeepSeekClient {
+export class DeepSeekClient implements LLMProvider {
   private apiKey: string;
   private baseUrl: string;
   private model: string;

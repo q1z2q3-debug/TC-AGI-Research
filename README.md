@@ -29,17 +29,43 @@
 - **自知 (get_state)**：完整态势快照
 
 ### 4. 自我进化机制
-每次任务完成后自动执行：
-1. 复盘全过程
-2. 提取经验（失败/成功）
-3. 写入记忆（持久化）
+每次任务完成后由引擎层 `evolveFromResults` 自动执行：
+1. 复盘全过程（成功/失败）
+2. **LLM 失败归因**（仅失败且已接入 LLM 时）：穿透表面报错，定位根因、归类、给出修正建议与可复用教训
+3. 写入记忆（持久化；归因作为独立标签 `failure-attribution` + 失败类别，便于后续检索）
 4. 优化流程（新技能/新工具）
 
-### 5. 技能/工具语义检索（替代关键词匹配）
+> 失败归因由 DeepSeek LLM 完成；未配置 `DEEPSEEK_API_KEY` 或 LLM 异常/解析失败时，自动降级为"成功/失败"二元复盘，绝不阻断主流程。
+
+### 5. 语义检索与 LLM 失败归因
+
+#### 5.1 技能/工具语义检索（替代关键词匹配）
 引擎在任务分解时，不再用脆弱的 `goal.includes(skill)` 子串匹配，而是通过 **余弦相似度** 从向量索引中检索最相关的技能与工具：
 - **嵌入来源**：默认本地 **Ollama**（`nomic-embed-text`），零 API 成本、零密钥
 - **优雅降级**：Ollama 不可达 / 未配置时，自动回退关键词匹配，绝不报错
 - **阈值可调**：`matchSkills(goal, topK, threshold)`，默认阈值 `0.25` 过滤弱相关
+
+#### 5.2 LLM 失败归因（真正的复盘）
+`evolveFromResults` 在任务失败时调用 LLM（依赖可注入的 `LLMProvider` 接口，真实实现为 `DeepSeekClient`），将复盘材料交给模型，返回结构化归因：
+
+```typescript
+interface FailureAttribution {
+  rootCause: string;        // 一句话根因（聚焦真正原因）
+  failedStep: string | null;// 失败步骤 id
+  category:                 // skill_mismatch | tool_failure | param_error
+    | 'skill_mismatch'      //   | dependency_blocked | timeout | llm_error | unknown
+    | 'tool_failure' | 'param_error' | 'dependency_blocked'
+    | 'timeout' | 'llm_error' | 'unknown';
+  correctiveAction: string; // 针对根因的修正建议
+  confidence: number;       // 0~1 归因置信度
+  lesson: string;           // 一句可复用教训
+}
+```
+
+归因结果会：
+- 写入记忆（内容含 `attribution`，标签含 `failure-attribution` 与失败类别）；
+- 驱动认知空间（`perceive("任务失败·根因[category]: lesson")` 而非泛化字符串）；
+- 通过 `evolved` 事件与控制台输出，便于运维与调试。
 
 ## 目录结构
 
@@ -101,7 +127,7 @@ npm run start:daemon
 
 | 变量 | 说明 | 默认 |
 |:----|:-----|:----|
-| `DEEPSEEK_API_KEY` | DeepSeek API 密钥；**留空则用本地规则引擎** | 空 |
+| `DEEPSEEK_API_KEY` | DeepSeek API 密钥；**留空则用本地规则引擎**。配置后同时启用：认知层语义觉知 + 引擎层 LLM 失败归因 | 空 |
 | `DEEPSEEK_BASE_URL` | DeepSeek 端点 | `https://api.deepseek.com` |
 | `DEEPSEEK_MODEL` | 模型名 | `deepseek-chat` |
 | `LOOP_INTERVAL_SEC` | 守护进程循环间隔（秒） | `30` |
@@ -139,7 +165,7 @@ await agi.shutdown();
 
 ## 版本
 
-v0.3.0-cognitive
+v0.3.1-attribution
 
 ## 许可证
 

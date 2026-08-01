@@ -10,6 +10,7 @@ import { MemorySystem } from '../memory/memory-system';
 import { SkillLoader, SkillMatch } from '../skills/skill-loader';
 import { MCPAdapter, ToolMatch } from '../tools/mcp-adapter';
 import { CronScheduler } from '../scheduler/cron-scheduler';
+import { LLMProvider } from '../cognitive/llm';
 import { Subject } from 'rxjs';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -48,6 +49,44 @@ export interface ExecutionResult {
   duration: number;
 }
 
+/**
+ * LLM 失败归因结果。
+ * 取代原先"成功/失败"的二元复盘，给出真正可复用的根因与修正建议。
+ */
+export interface FailureAttribution {
+  /** 一句话根因：聚焦真正原因，而非表面报错 */
+  rootCause: string;
+  /** 失败步骤 id（可定位时），否则 null */
+  failedStep: string | null;
+  /** 失败类别，用于归类与后续针对性改进 */
+  category:
+    | 'skill_mismatch'   // 技能与任务不匹配 / 技能不存在
+    | 'tool_failure'     // 工具执行报错
+    | 'param_error'      // 参数构造错误
+    | 'dependency_blocked' // 上游依赖未完成导致阻塞
+    | 'timeout'          // 超时
+    | 'llm_error'        // 大模型本身异常
+    | 'unknown';
+  /** 针对根因的具体修正建议（下一步该改什么） */
+  correctiveAction: string;
+  /** 归因置信度 0~1 */
+  confidence: number;
+  /** 一句可复用的经验教训 */
+  lesson: string;
+}
+
+const ATTRIBUTION_SYSTEM_PROMPT = `你是一个严谨的 AI 任务失败归因分析器。给定一次任务执行的复盘材料（目标、各步骤状态、错误、结果），请穿透表面报错，定位真正的失败根因，并给出可操作的修正建议。
+
+只输出 JSON，格式严格为：
+{
+  "rootCause": "一句话根因（聚焦真正原因，而非表面报错）",
+  "failedStep": "失败步骤的 id（若能定位，否则为 null）",
+  "category": "skill_mismatch|tool_failure|param_error|dependency_blocked|timeout|llm_error|unknown",
+  "correctiveAction": "针对根因的具体修正建议（下一步该改什么）",
+  "confidence": 0.0到1.0之间的小数,
+  "lesson": "一句可复用的经验教训"
+}`;
+
 export class EngineLayer {
   private ideology: IdeologyLayer;
   private cognitive: CognitiveSpace;
@@ -59,6 +98,7 @@ export class EngineLayer {
   private plans: Map<string, TaskPlan> = new Map();
   private runningPlans: Set<string> = new Set();
   private readonly MAX_RETRIES = 3;
+  private llm: LLMProvider | null = null;
 
   constructor(
     ideology: IdeologyLayer,
@@ -79,6 +119,15 @@ export class EngineLayer {
   async initialize() {
     console.log('⚙️ 研究引擎层初始化完成');
     this.events.next({ type: 'engine-ready' });
+  }
+
+  /** 接入 LLM（真实 DeepSeek / 测试用 FakeLLM），用于失败归因等语义分析 */
+  setLLM(client: LLMProvider): void {
+    this.llm = client;
+  }
+
+  get hasLLM(): boolean {
+    return this.llm !== null;
   }
 
   /**
@@ -398,29 +447,111 @@ export class EngineLayer {
     return { step: step.id, status: 'done', result: `executed: ${step.description}`, timestamp: new Date() };
   }
 
-  private async evolveFromResults(plan: TaskPlan, results: any[], errors: string[]) {
+  /**
+   * 真正的失败归因：仅当任务失败且已接入 LLM 时调用。
+   * 将复盘材料交给 LLM，穿透表面报错定位根因、归类、给出修正建议与可复用教训。
+   * 无 LLM 或 LLM 异常 / 解析失败时返回 null（触发优雅降级）。
+   */
+  private async attributeFailure(
+    plan: TaskPlan,
+    results: any[],
+    errors: string[]
+  ): Promise<FailureAttribution | null> {
+    if (!this.llm) return null;
+
+    const payload = {
+      goal: plan.goal,
+      steps: plan.steps.map(s => ({
+        id: s.id,
+        description: s.description,
+        skill: s.skill,
+        tool: s.tool,
+        status: s.status,
+        error: s.error,
+        retries: s.retries
+      })),
+      results,
+      errors
+    };
+
+    try {
+      const raw = await this.llm.complete(
+        ATTRIBUTION_SYSTEM_PROMPT,
+        `复盘材料：\n${JSON.stringify(payload, null, 2)}`
+      );
+      const parsed = JSON.parse(raw) as Partial<FailureAttribution>;
+      if (!parsed || typeof parsed.rootCause !== 'string') return null;
+
+      const category = parsed.category;
+      const validCategories: FailureAttribution['category'][] = [
+        'skill_mismatch', 'tool_failure', 'param_error',
+        'dependency_blocked', 'timeout', 'llm_error', 'unknown'
+      ];
+      return {
+        rootCause: String(parsed.rootCause),
+        failedStep: parsed.failedStep ?? null,
+        category: validCategories.includes(category as any) ? (category as FailureAttribution['category']) : 'unknown',
+        correctiveAction: String(parsed.correctiveAction || ''),
+        confidence: typeof parsed.confidence === 'number'
+          ? Math.max(0, Math.min(1, parsed.confidence))
+          : 0.5,
+        lesson: String(parsed.lesson || parsed.rootCause)
+      };
+    } catch (e) {
+      // 归因失败（网络/解析）→ 不阻断主流程，降级为无归因复盘
+      return null;
+    }
+  }
+
+  /**
+   * 根据执行结果进化认知：写入复盘记忆，失败时用 LLM 归因驱动认知与后续改进。
+   * 改为 public 以便外部/测试手动触发复盘。
+   */
+  async evolveFromResults(plan: TaskPlan, results: any[], errors: string[]) {
     const success = errors.length === 0;
+
+    // 真正的失败归因：仅当失败且已接入 LLM 时调用
+    let attribution: FailureAttribution | null = null;
+    if (!success && this.llm) {
+      attribution = await this.attributeFailure(plan, results, errors);
+    }
+
     const experience = {
       goal: plan.goal,
       success,
       steps: plan.steps.map(s => ({ id: s.id, status: s.status })),
       results,
       errors,
+      attribution,
       timestamp: new Date()
     };
 
-    // 更新认知空间
-    this.cognitive.perceive(`任务${success ? '成功' : '失败'}: ${plan.goal}`);
+    // 更新认知空间：成功 → 泛化；失败且有归因 → 用归因教训驱动（而非泛化字符串）
+    if (success) {
+      this.cognitive.perceive(`任务成功: ${plan.goal}`);
+    } else if (attribution) {
+      this.cognitive.perceive(`任务失败·根因[${attribution.category}]: ${attribution.lesson}`);
+    } else {
+      this.cognitive.perceive(`任务失败: ${plan.goal}`);
+    }
 
-    // 写入记忆
+    // 写入记忆（归因作为可复用教训固化；标签含类别便于后续检索）
     await this.memory.save({
       type: 'feedback',
       name: `复盘-${plan.id}`,
       content: JSON.stringify(experience),
       tags: ['self-evolve', 'plan', success ? 'success' : 'failure']
+        .concat(attribution ? ['failure-attribution', attribution.category] : [])
     });
 
-    this.events.next({ type: 'evolved', planId: plan.id, success });
+    this.events.next({ type: 'evolved', planId: plan.id, success, attribution });
+
+    // 显式输出归因，便于运维与调试
+    if (attribution) {
+      console.log(`🔍 失败归因[${attribution.category}] 根因: ${attribution.rootCause}`);
+      console.log(`   ↳ 修正建议: ${attribution.correctiveAction} (置信度 ${(attribution.confidence * 100).toFixed(0)}%)`);
+      console.log(`   ↳ 教训: ${attribution.lesson}`);
+    }
   }
 
   private delay(ms: number): Promise<void> {

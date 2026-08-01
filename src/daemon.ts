@@ -50,13 +50,14 @@ async function main() {
   const cognize = agi.getComponents().cognize;
   if (process.env.DEEPSEEK_API_KEY) {
     try {
-      cognize.setLLM(new DeepSeekClient());
-      console.log('🧠 LLM 认知增强已接入 (DeepSeek)');
+      // 统一接入：认知层语义觉知 + 引擎层失败归因 同步启用
+      agi.setLLM(new DeepSeekClient());
+      console.log('🧠 LLM 已接入 (DeepSeek)：认知觉知 + 失败归因');
     } catch (e) {
       console.warn('⚠️ LLM 接入失败，使用本地规则引擎:', (e as Error).message);
     }
   } else {
-    console.log('ℹ️ 未配置 DEEPSEEK_API_KEY，使用本地规则认知引擎');
+    console.log('ℹ️ 未配置 DEEPSEEK_API_KEY，使用本地规则认知引擎（无 LLM 失败归因）');
   }
 
   const intervalSec = parseInt(process.env.LOOP_INTERVAL_SEC || '30', 10);

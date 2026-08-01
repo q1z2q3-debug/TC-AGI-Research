@@ -9,6 +9,7 @@ import { InstanceLayer } from '../core/instance';
 import { CognitiveSpace } from '../cognitive/cognitive-space';
 import { DeepSeekCognize } from '../cognitive/deepseek-cognize';
 import { EmbeddingClient, EmbeddingProvider } from '../cognitive/embedding';
+import { DeepSeekClient } from '../cognitive/llm';
 import { MemorySystem } from '../memory/memory-system';
 import { SkillLoader } from '../skills/skill-loader';
 import { MCPAdapter } from '../tools/mcp-adapter';
@@ -66,6 +67,15 @@ export class TCAGI4 {
   setEmbedding(client: EmbeddingProvider): void {
     this.skillLoader.setEmbeddingClient(client);
     this.mcp.setEmbeddingClient(client);
+  }
+
+  /**
+   * 接入 LLM（真实 DeepSeek）：同时驱动认知层的语义觉知与引擎层的失败归因。
+   * 应在 start() 之前或之后调用皆可（setLLM 仅注册引用，不触发网络）。
+   */
+  setLLM(client: DeepSeekClient): void {
+    this.cognize.setLLM(client);
+    this.engine.setLLM(client);
   }
 
   async start(): Promise<void> {
