@@ -372,6 +372,8 @@ export class MemorySystem {
 
   async shutdown(): Promise<void> {
     await this.store.saveAll(this.memories);
+    // saveAll 仅调度防抖写入，shutdown 时需强制立即落盘，避免丢失尚未刷写的变更
+    await this.store.flush();
     console.log('💾 记忆系统已关闭');
   }
 }

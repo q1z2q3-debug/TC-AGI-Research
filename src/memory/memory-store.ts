@@ -15,6 +15,11 @@ export class MemoryStore {
   private memory: Memory[] = [];
   private isNode = typeof window === 'undefined';
 
+  // 防抖写入：避免每次 save 都触发文件 I/O，合并为一次批量写入
+  private dirty: boolean = false;
+  private debounceTimer: any = null;
+  private readonly DEBOUNCE_MS = 500;
+
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
@@ -71,7 +76,30 @@ export class MemoryStore {
     }
   }
 
-  private async saveToFile(): Promise<void> {
+  /**
+   * 调度一次防抖写入：标记 dirty 并设置定时器，在 DEBOUNCE_MS 后执行一次批量写入。
+   * 定时器到期前的多次调用会重置计时，从而被合并为一次文件 I/O，显著降低写入压力。
+   */
+  private scheduleFlush(): void {
+    this.dirty = true;
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = null;
+      this.doFlush().catch(() => {
+        // 写入失败静默忽略
+      });
+    }, this.DEBOUNCE_MS);
+  }
+
+  /**
+   * 执行实际的文件写入（仅 Node 环境）。仅当 dirty 为 true 时写入，
+   * 写入失败静默忽略以保持与原有错误处理一致。
+   */
+  private async doFlush(): Promise<void> {
+    if (!this.dirty) return;
+    this.dirty = false;
     try {
       const fs = await import('fs');
       const path = await import('path');
@@ -81,6 +109,18 @@ export class MemoryStore {
     } catch (e) {
       // 忽略写入错误
     }
+  }
+
+  /**
+   * 强制立即写入所有待持久化的变更。
+   * 清除待执行的防抖定时器并立即执行一次写入，适用于 shutdown 或显式持久化场景。
+   */
+  async flush(): Promise<void> {
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    await this.doFlush();
   }
 
   async loadAll(): Promise<Memory[]> {
@@ -109,7 +149,8 @@ export class MemoryStore {
       } else {
         this.memory.push(memory);
       }
-      await this.saveToFile();
+      // 标记 dirty 并调度防抖写入，避免每次 save 都触发文件 I/O
+      this.scheduleFlush();
       return;
     }
     if (!this.db) {
@@ -132,6 +173,21 @@ export class MemoryStore {
   }
 
   async saveAll(memories: Memory[]): Promise<void> {
+    await this.ensureInitialized();
+    if (this.isNode) {
+      // Node 环境：先在内存中批量更新，再仅调度一次防抖写入（而非循环调用 save）
+      for (const m of memories) {
+        const index = this.memory.findIndex(existing => existing.id === m.id);
+        if (index >= 0) {
+          this.memory[index] = m;
+        } else {
+          this.memory.push(m);
+        }
+      }
+      this.scheduleFlush();
+      return;
+    }
+    // 浏览器环境：保持原有逐条写入逻辑（IndexedDB 本身是异步的）
     for (const m of memories) {
       await this.save(m);
     }
@@ -141,7 +197,7 @@ export class MemoryStore {
     await this.ensureInitialized();
     if (this.isNode) {
       this.memory = this.memory.filter(m => m.id !== id);
-      await this.saveToFile();
+      this.scheduleFlush();
       return;
     }
     if (!this.db) {

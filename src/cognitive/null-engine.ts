@@ -51,6 +51,10 @@ export interface SkillCreationResult {
   duration: number;
   /** 失败原因（若失败） */
   error?: string;
+  /** 是否经过 LLM 优化 */
+  optimized?: boolean;
+  /** 优化原因 */
+  optimizationReason?: string;
 }
 
 /** 技能蓝图（结晶前的中间态） */
@@ -71,6 +75,8 @@ export const CREATION_STAGES = [
 export interface NullEngineDeps {
   /** 注册技能到加载器 */
   registerSkill: (skill: Skill) => void;
+  /** 注销技能（用于重新注册前注销旧的） */
+  unregisterSkill?: (name: string) => void;
   /** 检查技能是否已存在 */
   hasSkill: (name: string) => boolean;
   /** 写入记忆 */
@@ -131,7 +137,7 @@ export class NullEngine {
 
       // ═══ 阶段4: 结晶 ═══
       // 将蓝图固化为 Skill 对象
-      const skill = this.crystallizeSkill(blueprint, request);
+      let skill = this.crystallizeSkill(blueprint, request);
 
       // 结晶态：因缘具足，果可期待
       const crystalVector = TritVectorOps.fromArray([0, 1, 1, 1, 1, 0, 1, 1, 1]);
@@ -167,9 +173,33 @@ export class NullEngine {
       }
 
       // ═══ 阶段7: 调优 ═══
-      // 根据试运行结果修正（当前版本：如果试运行有警告，记录但不阻断）
-      if (trialResult?.warning) {
-        // 未来版本可通过 LLM 自动修正技能逻辑
+      // 根据试运行结果，通过 LLM 闭环修正技能逻辑（最多重试一次）
+      let optimized = false;
+      let optimizationReason = '';
+      if (trialResult?.warning || trialResult?.error) {
+        const trialError = trialResult?.warning || trialResult?.error || '未知错误';
+        const optimizedBlueprint = await this.optimizeBlueprint(blueprint, request, trialError);
+        if (optimizedBlueprint) {
+          // 重新结晶并注册
+          const optimizedSkill = this.crystallizeSkill(optimizedBlueprint, request);
+          // 注销旧技能并注册新技能
+          if (this.deps.unregisterSkill) {
+            this.deps.unregisterSkill(skill.name);
+          }
+          this.deps.registerSkill(optimizedSkill);
+          // 更新 skill 引用，使后续固化与返回结果反映优化后的技能
+          skill = optimizedSkill;
+          // 再次试运行
+          try {
+            const retrialResult = await optimizedSkill.execute(request.parameters || { goal: request.goal });
+            optimized = true;
+            optimizationReason = `LLM 优化成功: ${trialError} → 已修正`;
+            trialResult = retrialResult;
+          } catch (retrialError) {
+            // 再次失败仅记录，不阻断流程（最多重试一次）
+            optimizationReason = `LLM 优化后仍失败: ${String(retrialError)}`;
+          }
+        }
       }
 
       // ═══ 阶段8: 固化 ═══
@@ -198,7 +228,9 @@ export class NullEngine {
         success: true,
         skill,
         creationTrace,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
+        optimized,
+        optimizationReason
       };
 
       // 记录创造历史
@@ -277,6 +309,67 @@ export class NullEngine {
 
     // 规则推断：根据目标关键词生成技能蓝图
     return this.inferBlueprint(skillName, request, memories);
+  }
+
+  /**
+   * 优化技能蓝图（调优阶段）
+   *
+   * 当试运行失败或产生警告时，调用 LLM 分析失败原因并生成修正后的蓝图。
+   * 修正后的蓝图保留原始 name（避免重新注册冲突），但更新 description、
+   * instructions、executeLogic。
+   *
+   * 如果 LLM 不可用或调用失败，返回 null 以便优雅降级。
+   */
+  private async optimizeBlueprint(
+    originalBlueprint: SkillBlueprint,
+    request: SkillCreationRequest,
+    trialError: string
+  ): Promise<SkillBlueprint | null> {
+    // LLM 不可用时无法进行闭环修正
+    if (!this.deps.llmComplete) {
+      return null;
+    }
+
+    try {
+      const systemPrompt = `你是一个技能优化引擎。一个自动创造的技能在试运行时失败了，请分析失败原因并生成修正后的技能定义。
+只输出 JSON，格式：
+{
+  "name": "技能名称(保持不变)",
+  "description": "修正后的技能描述",
+  "instructions": "修正后的执行指令",
+  "executeLogic": "修正后的执行逻辑类型(search|analyze|generate|transform|monitor|generic)"
+}
+注意：name 字段必须与原始蓝图完全一致。`;
+
+      const userPrompt = `任务目标: ${request.goal}
+步骤描述: ${request.stepDescription}
+原始蓝图:
+  name: ${originalBlueprint.name}
+  description: ${originalBlueprint.description}
+  instructions: ${originalBlueprint.instructions}
+  executeLogic: ${originalBlueprint.executeLogic}
+试运行错误: ${trialError}
+
+请分析错误原因，并输出修正后的技能定义 JSON。`;
+
+      const raw = await this.deps.llmComplete(systemPrompt, userPrompt);
+      const parsed = JSON.parse(raw) as Partial<SkillBlueprint>;
+
+      if (!parsed || !parsed.description) {
+        return null;
+      }
+
+      // 保留原始 name（避免重新注册冲突），更新其余字段
+      return {
+        name: originalBlueprint.name,
+        description: parsed.description,
+        instructions: parsed.instructions || originalBlueprint.instructions,
+        executeLogic: parsed.executeLogic || originalBlueprint.executeLogic
+      };
+    } catch {
+      // LLM 调用失败或解析失败，优雅降级
+      return null;
+    }
   }
 
   /**

@@ -12,8 +12,8 @@ import { MCPAdapter, ToolMatch } from '../tools/mcp-adapter';
 import { CronScheduler } from '../scheduler/cron-scheduler';
 import { LLMProvider } from '../cognitive/llm';
 import { NullEngine } from '../cognitive/null-engine';
-import { ActiveInference, CognitiveAction } from '../cognitive/active-inference';
-import { PrototypeMatcher } from '../cognitive/prototypes';
+import { ActiveInference, CognitiveAction, EnvironmentalModel, PRECISION_PRESETS } from '../cognitive/active-inference';
+import { PrototypeMatcher, PrototypeDiscovery } from '../cognitive/prototypes';
 import { Subject } from 'rxjs';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -90,6 +90,27 @@ const ATTRIBUTION_SYSTEM_PROMPT = `你是一个严谨的 AI 任务失败归因�
   "lesson": "一句可复用的经验教训"
 }`;
 
+/**
+ * LLM 策略派生系统提示
+ * 统一策略派生逻辑：当 LLM 可用时，由 LLM 根据认知状态派生策略；
+ * LLM 不可用时回退到规则派生。两者输出格式统一。
+ */
+const STRATEGY_SYSTEM_PROMPT = `你是一个认知策略分析器。给定当前九维三元认知向量（每维 -1/0/1）和任务目标，请派生最优执行策略。
+
+维度含义：
+- 时间：past(过去) present(现在) future(未来)
+- 空间：internal(内) medial(中) external(外)
+- 因果：cause(因) condition(缘) effect(果)
+
+只输出 JSON，格式严格为：
+{
+  "name": "策略名称（8字以内）",
+  "mode": "expand|contract|observe|transform|create",
+  "priority": 1到3的整数(1=最高),
+  "confidence": 0.0到1.0之间的小数,
+  "reasoning": "一句话策略理由"
+}`;
+
 export class EngineLayer {
   private ideology: IdeologyLayer;
   private cognitive: CognitiveSpace;
@@ -103,6 +124,8 @@ export class EngineLayer {
   private readonly MAX_RETRIES = 3;
   private llm: LLMProvider | null = null;
   private nullEngine: NullEngine | null = null;
+  /** 环境模型：追踪行动对外部环境的影响 */
+  private environmentModel: EnvironmentalModel = new EnvironmentalModel();
 
   constructor(
     ideology: IdeologyLayer,
@@ -125,6 +148,7 @@ export class EngineLayer {
     this.nullEngine = new NullEngine({
       registerSkill: (skill) => this.skillLoader.registerSkill(skill),
       hasSkill: (name) => this.skillLoader.getSkill(name) !== undefined,
+      unregisterSkill: (name) => { /* registerSkill 使用 Map.set 自动覆盖，此处保留接口一致性 */ },
       saveMemory: async (memory) => this.memory.save(memory),
       retrieveMemory: (query, limit) => this.memory.retrieve(query, limit || 5),
       llmComplete: this.llm
@@ -132,7 +156,7 @@ export class EngineLayer {
         : undefined
     });
 
-    console.log('⚙️ 研究引擎层初始化完成（含空引擎·技能创造闭环）');
+    console.log('⚙️ 研究引擎层初始化完成（含空引擎·技能创造闭环·环境模型）');
     this.events.next({ type: 'engine-ready' });
   }
 
@@ -152,8 +176,8 @@ export class EngineLayer {
     // 1. 感知当前认知状态
     const cognitiveState = this.cognitive.perceive(goal);
 
-    // 2. 推理策略
-    const strategy = this.deriveStrategy(cognitiveState);
+    // 2. 推理策略（LLM 统一派生 / 规则回退）
+    const strategy = await this.deriveStrategy(cognitiveState);
 
     // 3. 获取相关记忆
     const memories = this.memory.retrieve(goal, 5);
@@ -184,64 +208,54 @@ export class EngineLayer {
   }
 
   /**
-   * 基于认知状态派生策略
+   * 基于认知状态派生策略（统一入口）
    *
-   * 升级：集成主动推理引擎（Active Inference），
-   *      通过自由能最小化选择最优认知行动，
-   *      而非仅依靠简单的多数态判断。
+   * 升级：统一策略派生逻辑
+   *   1. LLM 可用时 → 由 LLM 根据认知状态派生策略（主路径）
+   *   2. LLM 不可用时 → 规则派生（回退路径）
+   *   3. 两种路径都集成主动推理引擎（精度加权 + 环境模型）
+   *   4. 从历史轨迹中发现新原型（经验学习）
    */
-  private deriveStrategy(state: any): any {
+  private async deriveStrategy(state: any): Promise<any> {
     const majority = state.vector ? this.getMajority(state.vector) : 0;
-    const snapshot = this.cognitive.getSnapshot();
 
-    // 基础策略（保留原有逻辑作为回退）
-    let strategy: any = {
-      name: '平衡策略',
-      mode: 'observe',
-      priority: 2,
-      steps: []
-    };
+    // ═══ 策略派生：LLM 优先，规则回退 ═══
+    let strategy: any;
 
-    if (majority === 1) {
-      // 扩张态
-      if (state.vector.internal === 1 && state.vector.external === 1) {
-        strategy = { name: '内外协同·全面扩张', mode: 'expand', priority: 1, confidence: 0.85 };
-      } else if (state.vector.internal === 1) {
-        strategy = { name: '由内向外·稳健扩张', mode: 'expand', priority: 1, confidence: 0.75 };
-      } else {
-        strategy = { name: '积极进取·快速推进', mode: 'expand', priority: 1, confidence: 0.65 };
-      }
-    } else if (majority === -1) {
-      // 收缩态
-      if (state.vector.internal === -1) {
-        strategy = { name: '修复内核·稳固根基', mode: 'contract', priority: 3, confidence: 0.8 };
-      } else if (state.vector.external === -1) {
-        strategy = { name: '环境防御·保存实力', mode: 'contract', priority: 2, confidence: 0.75 };
-      } else {
-        strategy = { name: '收缩反思·等待时机', mode: 'contract', priority: 2, confidence: 0.6 };
-      }
+    if (this.llm) {
+      // 主路径：LLM 统一派生
+      strategy = await this.deriveStrategyViaLLM(state);
     } else {
-      // 观察态
-      if (state.vector.medial === 1) {
-        strategy = { name: '通道畅通·连接探索', mode: 'observe', priority: 2, confidence: 0.7 };
-      } else {
-        strategy = { name: '信息收集·认知准备', mode: 'observe', priority: 2, confidence: 0.65 };
-      }
+      // 回退路径：规则派生
+      strategy = this.deriveStrategyViaRules(state, majority);
     }
 
-    // 因果维度调节
-    if (state.vector.cause === 1 && state.vector.condition === 1) {
-      strategy.confidence = Math.min(1, (strategy.confidence || 0.5) + 0.15);
-    }
-
-    // ═══ 主动推理增强 ═══
-    // 使用主动推理引擎选择最优认知行动
+    // ═══ 主动推理增强（精度加权 + 环境模型）═══
     try {
       const history = this.cognitive.getHistory().map(h => h.vector);
+
+      // 从历史中发现新原型（经验学习）
+      if (history.length >= 10) {
+        const discoveries = PrototypeDiscovery.discover(history, { maxDiscoveries: 3 });
+        if (discoveries.length > 0) {
+          strategy.discoveredPrototypes = discoveries.map(d => ({
+            name: d.name,
+            frequency: d.frequency,
+            avgDwellTime: d.avgDwellTime
+          }));
+        }
+      }
+
+      // 根据策略模式选择精度预设
+      const precisionPreset = this.selectPrecisionPreset(strategy.mode, state.vector);
+
       const inference = ActiveInference.infer(state.vector, history, {
         freeEnergyThreshold: 0.1,
         transitionPenalty: 0.1,
-        useHistory: history.length >= 2
+        useHistory: history.length >= 2,
+        precisionPreset,
+        environment: this.environmentModel,
+        environmentWeight: 0.2
       });
 
       // 如果主动推理建议的行动与基础策略不同，且自由能改善显著，则采纳
@@ -268,11 +282,115 @@ export class EngineLayer {
       // 添加原型推荐
       const recommendation = PrototypeMatcher.recommendAction(state.vector);
       strategy.prototypeRecommendation = recommendation;
+      strategy.precisionPreset = precisionPreset;
+      strategy.environmentStability = this.environmentModel.getState().stability;
     } catch {
       // 主动推理失败不影响基础策略
     }
 
     return strategy;
+  }
+
+  /**
+   * LLM 统一策略派生
+   * 将认知状态向量发送给 LLM，由 LLM 返回结构化策略建议。
+   */
+  private async deriveStrategyViaLLM(state: any): Promise<any> {
+    try {
+      const v = state.vector;
+      const userPrompt = `认知向量：
+时间: past=${v.past} present=${v.present} future=${v.future}
+空间: internal=${v.internal} medial=${v.medial} external=${v.external}
+因果: cause=${v.cause} condition=${v.condition} effect=${v.effect}
+
+任务目标: ${state.summary || '未指定'}`;
+
+      const raw = await this.llm!.complete(STRATEGY_SYSTEM_PROMPT, userPrompt);
+      const parsed = JSON.parse(raw);
+
+      if (parsed && parsed.mode) {
+        return {
+          name: parsed.name || 'LLM策略',
+          mode: parsed.mode,
+          priority: parsed.priority || 2,
+          confidence: parsed.confidence || 0.7,
+          reasoning: parsed.reasoning || '',
+          source: 'llm'
+        };
+      }
+    } catch {
+      // LLM 调用失败，回退到规则
+    }
+
+    // 回退
+    return this.deriveStrategyViaRules(state, this.getMajority(state.vector));
+  }
+
+  /**
+   * 规则策略派生（LLM 不可用时的回退）
+   */
+  private deriveStrategyViaRules(state: any, majority: number): any {
+    let strategy: any = {
+      name: '平衡策略',
+      mode: 'observe',
+      priority: 2,
+      steps: [],
+      source: 'rules'
+    };
+
+    if (majority === 1) {
+      if (state.vector.internal === 1 && state.vector.external === 1) {
+        strategy = { name: '内外协同·全面扩张', mode: 'expand', priority: 1, confidence: 0.85, source: 'rules' };
+      } else if (state.vector.internal === 1) {
+        strategy = { name: '由内向外·稳健扩张', mode: 'expand', priority: 1, confidence: 0.75, source: 'rules' };
+      } else {
+        strategy = { name: '积极进取·快速推进', mode: 'expand', priority: 1, confidence: 0.65, source: 'rules' };
+      }
+    } else if (majority === -1) {
+      if (state.vector.internal === -1) {
+        strategy = { name: '修复内核·稳固根基', mode: 'contract', priority: 3, confidence: 0.8, source: 'rules' };
+      } else if (state.vector.external === -1) {
+        strategy = { name: '环境防御·保存实力', mode: 'contract', priority: 2, confidence: 0.75, source: 'rules' };
+      } else {
+        strategy = { name: '收缩反思·等待时机', mode: 'contract', priority: 2, confidence: 0.6, source: 'rules' };
+      }
+    } else {
+      if (state.vector.medial === 1) {
+        strategy = { name: '通道畅通·连接探索', mode: 'observe', priority: 2, confidence: 0.7, source: 'rules' };
+      } else {
+        strategy = { name: '信息收集·认知准备', mode: 'observe', priority: 2, confidence: 0.65, source: 'rules' };
+      }
+    }
+
+    // 因果维度调节
+    if (state.vector.cause === 1 && state.vector.condition === 1) {
+      strategy.confidence = Math.min(1, (strategy.confidence || 0.5) + 0.15);
+    }
+
+    return strategy;
+  }
+
+  /**
+   * 根据策略模式和选择精度预设
+   * 不同模式下认知系统关注不同维度：
+   *   expand/contract → execution（因果加权）
+   *   observe → observation（时间加权）
+   *   transform/create → crisis（外部+因果加权）
+   */
+  private selectPrecisionPreset(mode: string, vector: any): keyof typeof PRECISION_PRESETS {
+    // 检测危机信号
+    if (vector.external === -1 || vector.internal === -1) {
+      return 'crisis';
+    }
+    switch (mode) {
+      case 'expand':
+      case 'contract':
+        return 'execution';
+      case 'observe':
+        return 'observation';
+      default:
+        return 'default';
+    }
   }
 
   private getMajority(vector: any): number {

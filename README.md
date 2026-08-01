@@ -11,11 +11,12 @@
 
 ## 核心设计理念
 
-### 1. 三元索引记忆系统
+### 1. 三元索引记忆系统（v0.5 升级）
 - **卦象索引 (0~19682)**：九维三态空间坐标，粗粒度定位
 - **π 展开深度 (1~10)**：波动度决定精度深度，细粒度聚类
 - **e 呼吸相位**：时间活性权重（7天半衰期），记忆永不枯竭
 - **三元认知距离检索**：使用复合距离（Hamming+Manhattan+Euclidean+Cosine）替代关键词匹配
+- **批量写入 + 防抖（v0.5 新增）**：MemoryStore 使用 500ms 防抖定时器合并频繁的写入操作，将多次 I/O 合并为一次批量持久化，显著降低磁盘 I/O 压力
 
 ### 2. 九维 Trit 认知向量
 - **时间维度**：过去·现在·未来
@@ -41,7 +42,7 @@
 - e (2.71828) → 时间维度权重（时间演化的连续性）
 - γ (0.57722) → 因果维度权重（欧拉常数，因果链的稀疏性）
 
-### 4. 认知原型与极限环（v0.4 新增）
+### 4. 认知原型与极限环（v0.5 升级）
 
 在 19683 种认知状态中，真正稳定的"吸引子"只有五个认知原型：
 
@@ -55,6 +56,8 @@
 
 **Φ 序参量**：衡量认知系统在历史轨迹中有多少比例处于稳定原型附近。Φ 高 → 认知稳定，Φ 低 → 认知混沌。
 
+**原型发现（v0.5 新增）**：从历史认知轨迹中自动发现新的"个性化吸引子"。通过频率统计、稳定性过滤、去重与聚类合并，识别出系统反复回到的复合状态。发现的原型动态注册，使认知系统具备经验学习能力。
+
 ### 5. 三元逻辑门与"和"态涌现（v0.4 新增）
 
 在二元逻辑（0/1）中，AND/OR 只能产生 0 或 1。但在三元逻辑（-1/0/+1）中，"和"态（0）可以作为对立力量的平衡而涌现。
@@ -66,7 +69,7 @@
 
 其他门：NOT（取反）、MIN（取小/阴主导）、MAX（取大/阳主导）、SHIFT（移位）、MERGE（融合）、CONSENSUS（共识投票）、BALANCE（平衡）
 
-### 6. 空引擎 · 技能创造闭环（v0.4 新增）
+### 6. 空引擎 · 技能创造闭环（v0.5 升级）
 
 "无中生有"——当技能不存在时，从空态（全0向量）出发，通过九步爻变涌现新技能：
 
@@ -76,11 +79,11 @@
 4. **结晶**：将蓝图固化为可执行的 Skill 对象
 5. **注册**：将新技能注册到 SkillLoader
 6. **试行**：执行一次试运行验证
-7. **调优**：根据试运行结果修正
+7. **调优**：根据试运行结果修正（**v0.5：LLM 闭环修正**——试运行失败时，调用 LLM 分析错误原因并重新生成修正蓝图，重新结晶、注册、再试运行，最多重试一次）
 8. **固化**：写入记忆系统作为"已创造技能"记录
 9. **归元**：认知状态回归，创造完成
 
-### 7. 主动推理引擎（v0.4 新增）
+### 7. 主动推理引擎（v0.5 升级）
 
 基于自由能最小化原理（Free Energy Principle, Friston 2010），在九维三元认知空间中实现状态转移决策：
 
@@ -88,12 +91,39 @@
 - **行动**：选择能将认知状态推向目标原型的行动
 - **自由能** ≈ 预测状态与目标原型之间的认知距离
 
+v0.5 新增能力：
+
+#### 精度加权自由能（Precision Weighting）
+精度 π_d 表示认知系统对维度 d 的预测置信度。高精度维度的预测误差对自由能贡献更大，使认知系统能"聚焦"于当前最关键的维度。
+
+场景化精度预设：
+| 预设 | 场景 | 加权维度 |
+|------|------|---------|
+| execution | 执行任务 | 因果维度（cause/condition/effect）|
+| observation | 观察学习 | 时间维度（past/present/future）|
+| crisis | 危机应对 | 外部+因果维度（external/cause）|
+
+#### 环境模型（Environmental Model）
+认知行动不仅影响内部状态，还影响外部环境。环境模型追踪：
+- 外部世界的认知投影（external/medial 维度）
+- 环境稳定性（预测准确度反馈调节）
+- 行动对环境的历史响应记录
+
+五种行动的环境响应规则：
+| 行动 | 环境效应 | 稳定性影响 |
+|------|---------|-----------|
+| expand | 外部条件改善 | 预测准确→稳定+ |
+| contract | 外部条件可能恶化 | 预测准确→稳定+ |
+| observe | 环境不变 | 稳定 |
+| transform | 环境剧烈波动 | 稳定- |
+| create | 环境缓慢改善 | 稳定+ |
+
 支持多步预测（模拟未来认知轨迹）和自由能历史分析（趋势检测与收敛判断）。
 
-### 8. DeepSeekCognize 认知循环
+### 8. DeepSeekCognize 认知循环（v0.5 升级）
 - **觉知 (perceive / perceiveLLM)**：输入 → Trit分解 → 卦象 → π/e调节
-  - 默认本地规则引擎；配置 `DEEPSEEK_API_KEY` 后由 DeepSeek LLM 抽取语义向量（网络异常自动降级）
-- **推理 (reason)**：状态 → 策略派生（扩张/收缩/观察）
+  - 默认本地规则引擎（**v0.5：中英文双语关键词映射**）；配置 `DEEPSEEK_API_KEY` 后由 DeepSeek LLM 抽取语义向量（网络异常自动降级）
+- **推理 (reason)**：状态 → 策略派生（**v0.5：统一策略派生**——LLM 可用时由 LLM 根据认知向量派生策略，不可用时回退规则派生；两条路径都集成主动推理精度加权 + 环境模型）
 - **进化 (evolve)**：结果反馈 → **增量**调整认知向量
 - **自知 (get_state)**：完整态势快照
 
@@ -116,24 +146,24 @@ TC-AGI-Research/
 ├── src/
 │   ├── core/               # 核心层
 │   │   ├── ideology.ts     # 意识形态层（含合规守卫）
-│   │   ├── engine.ts       # 研究引擎层（含主动推理增强、空引擎集成）
+│   │   ├── engine.ts       # 研究引擎层（统一策略派生 + 主动推理 + 空引擎集成 + 环境模型）
 │   │   └── instance.ts     # 生命体实例层
 │   ├── cognitive/          # 认知空间层
 │   │   ├── trit-vector.ts  # 九维向量运算（含四种距离度量）
 │   │   ├── distance.ts     # 认知距离函数系统（六种距离 + 复合融合）
-│   │   ├── prototypes.ts   # 认知原型与极限环（五大原型 + Φ序参量）
+│   │   ├── prototypes.ts   # 认知原型与极限环（五大原型 + Φ序参量 + 原型发现）
 │   │   ├── trit-gates.ts   # 三元逻辑门（和态涌现 + 极化分析）
-│   │   ├── null-engine.ts  # 空引擎（九步爻变技能创造闭环）
-│   │   ├── active-inference.ts # 主动推理引擎（自由能最小化）
+│   │   ├── null-engine.ts  # 空引擎（九步爻变技能创造闭环 + LLM闭环修正）
+│   │   ├── active-inference.ts # 主动推理引擎（精度加权自由能 + 环境模型）
 │   │   ├── cognitive-space.ts  # 认知空间管理
 │   │   ├── deepseek-cognize.ts # 认知循环（接真实 LLM）
-│   │   ├── semantic.ts     # 语义坐标映射（认知/记忆共用）
+│   │   ├── semantic.ts     # 语义坐标映射（中英文双语，认知/记忆共用）
 │   │   ├── llm.ts          # DeepSeek 客户端（优雅降级）
 │   │   └── embedding.ts    # 本地 Ollama 语义嵌入（余弦检索）
 │   ├── memory/             # 记忆系统
 │   │   ├── memory-types.ts # 统一类型定义（唯一事实来源）
 │   │   ├── memory-system.ts # 三元距离检索记忆系统
-│   │   └── memory-store.ts  # 持久化存储
+│   │   └── memory-store.ts  # 持久化存储（批量写入 + 防抖）
 │   ├── skills/             # 技能系统
 │   │   └── skill-loader.ts
 │   ├── tools/              # MCP工具适配
@@ -202,10 +232,20 @@ import { CognitiveDistance, PrototypeMatcher } from 'tc-agi-research';
 const dist = CognitiveDistance.composite(vectorA, vectorB);
 const proto = PrototypeMatcher.snapTo(currentVector);
 
-// 主动推理决策
-import { ActiveInference } from 'tc-agi-research';
-const inference = ActiveInference.infer(currentVector, history);
+// 主动推理决策（v0.5：精度加权 + 环境模型）
+import { ActiveInference, EnvironmentalModel, PRECISION_PRESETS } from 'tc-agi-research';
+const envModel = new EnvironmentalModel();
+const inference = ActiveInference.infer(currentVector, history, {
+  precisionPreset: 'execution',  // 执行模式：因果维度加权
+  environment: envModel,         // 启用环境感知自由能
+  environmentWeight: 0.2
+});
 console.log(inference.bestAction);
+
+// 原型发现（v0.5：从历史轨迹中学习吸引子）
+import { PrototypeDiscovery } from 'tc-agi-research';
+const discoveries = PrototypeDiscovery.discover(history, { minOccurrences: 3 });
+console.log(discoveries);  // 发现的个性化认知原型
 
 // 三元逻辑门（和态涌现）
 import { vectorMid, isHeEmergent } from 'tc-agi-research';
@@ -235,7 +275,7 @@ await agi.shutdown();
 
 ## 版本
 
-v0.4.0-cognitive-upgrade
+v0.5.0-deep-evolution
 
 ## 许可证
 

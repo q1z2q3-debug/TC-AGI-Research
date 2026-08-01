@@ -27,10 +27,192 @@
  *   5. 选择自由能最低的行动
  */
 
-import { TritVector, TritVectorOps, ALL_DIMENSIONS, TritDimension } from './trit-vector';
+import { TritVector, TritVectorOps, ALL_DIMENSIONS, TritDimension, Trit } from './trit-vector';
 import { CognitiveDistance } from './distance';
 import { PrototypeMatcher, CognitivePrototype, PROTOTYPES } from './prototypes';
 import { vectorShift, vectorMid, vectorMerge } from './trit-gates';
+
+/**
+ * 精度权重（Precision Weights）
+ * ─────────────────────────────────────────────────────────────
+ *
+ * 精度 π_d 表示认知系统对维度 d 的预测置信度（逆方差）。
+ *   π 高 → 该维度的预测误差对自由能贡献大（更"在意"这个维度）
+ *   π 低 → 该维度的预测误差被衰减（更"容忍"偏差）
+ *
+ * 默认所有维度精度 = 1（等权）。
+ * 系统可根据上下文动态调整：
+ *   - 执行任务时，因果维度精度提升（更关注目标达成）
+ *   - 观察学习时，时间维度精度提升（更关注趋势变化）
+ *   - 危机应对时，空间外部维度精度提升（更关注环境威胁）
+ */
+export type PrecisionWeights = Record<TritDimension, number>;
+
+/** 默认精度：所有维度等权 */
+const DEFAULT_PRECISION: PrecisionWeights = {
+  past: 1, present: 1, future: 1,
+  internal: 1, medial: 1, external: 1,
+  cause: 1, condition: 1, effect: 1
+};
+
+/**
+ * 场景化精度预设
+ */
+export const PRECISION_PRESETS: Record<string, PrecisionWeights> = {
+  /** 默认：等权 */
+  default: { ...DEFAULT_PRECISION },
+  /** 执行模式：因果维度加权 */
+  execution: { past: 0.8, present: 1.2, future: 1.0, internal: 0.8, medial: 0.8, external: 0.8, cause: 1.5, condition: 1.3, effect: 1.5 },
+  /** 观察模式：时间维度加权 */
+  observation: { past: 1.5, present: 1.3, future: 1.2, internal: 1.0, medial: 1.0, external: 1.0, cause: 0.8, condition: 0.8, effect: 0.8 },
+  /** 危机模式：外部+因果加权 */
+  crisis: { past: 0.8, present: 1.2, future: 1.0, internal: 1.2, medial: 1.0, external: 1.8, cause: 1.3, condition: 1.0, effect: 1.2 },
+};
+
+/**
+ * 环境模型 (Environmental Model)
+ * ─────────────────────────────────────────────────────────────
+ *
+ * 主动推理的核心扩展：认知行动不仅影响内部状态，还影响外部环境。
+ * 环境模型追踪外部世界的"认知投影"，并模拟行动对环境的影响。
+ *
+ * 生成模型：s_{t+1} = f(s_t, a_t) + noise
+ *   - 内部状态转移：认知操作改变内部认知向量
+ *   - 外部状态转移：行动对外部环境产生可预测的影响
+ *   - 感知映射：外部状态部分反馈到内部认知（观测模型）
+ *
+ * 环境响应规则（三元逻辑）：
+ *   expand → 外部环境趋向 +1（积极行动改善外部条件）
+ *   contract → 外部环境趋向 -1（保守行动可能错失机会）
+ *   observe → 外部环境趋向 0（观察不改变环境，但收集信息）
+ *   transform → 外部环境剧烈波动（变革带来不确定性）
+ *   create → 外部环境缓慢趋向 +1（创造长期改善环境）
+ */
+export interface EnvironmentalState {
+  /** 环境的认知投影向量（仅空间+因果维度有意义） */
+  externalProjection: Partial<TritVector>;
+  /** 环境稳定性 0~1（1=高度可预测） */
+  stability: number;
+  /** 环境对行动的历史响应记录 */
+  responseHistory: { action: CognitiveAction; delta: number }[];
+}
+
+export class EnvironmentalModel {
+  private state: EnvironmentalState;
+  private readonly MAX_RESPONSE_HISTORY = 20;
+
+  constructor() {
+    this.state = {
+      externalProjection: { external: 0, medial: 0 },
+      stability: 0.5,
+      responseHistory: []
+    };
+  }
+
+  /** 获取当前环境状态 */
+  getState(): EnvironmentalState {
+    return {
+      externalProjection: { ...this.state.externalProjection },
+      stability: this.state.stability,
+      responseHistory: [...this.state.responseHistory]
+    };
+  }
+
+  /**
+   * 预测行动对环境的影响
+   * 返回环境维度的预期变化量
+   */
+  predictEnvironmentalEffect(action: CognitiveAction): Partial<TritVector> {
+    const effect: Partial<TritVector> = {};
+    const stability = this.state.stability;
+
+    switch (action) {
+      case 'expand':
+        // 扩张行动：外部条件趋向改善，但幅度受稳定性限制
+        effect.external = Math.round(stability * 0.8) as Trit;  // 通常 +1 或 0
+        effect.medial = Math.round(stability * 0.6) as Trit;    // 通道也改善
+        break;
+      case 'contract':
+        // 收缩行动：外部条件可能恶化（错失机会）
+        effect.external = -Math.round(stability * 0.5) as Trit;
+        break;
+      case 'observe':
+        // 观察行动：环境不变，但信息增加
+        effect.medial = 0;
+        break;
+      case 'transform':
+        // 转化行动：环境剧烈波动
+        effect.external = (Math.random() > 0.5 ? 1 : -1) as Trit;
+        effect.medial = -1;
+        break;
+      case 'create':
+        // 创生行动：长期改善环境
+        effect.external = 1;
+        effect.medial = 1;
+        break;
+      case 'hold':
+        // 保持：环境自然衰减
+        effect.external = 0;
+        break;
+    }
+
+    return effect;
+  }
+
+  /**
+   * 更新环境状态：应用行动效果并更新稳定性
+   */
+  update(action: CognitiveAction, actualEffect: Partial<TritVector>): void {
+    // 记录响应
+    const predicted = this.predictEnvironmentalEffect(action);
+    const predictedDelta = predicted.external || 0;
+    const actualDelta = actualEffect.external || 0;
+    const predictionError = Math.abs(predictedDelta - actualDelta);
+
+    // 更新稳定性：预测准确 → 稳定性提升，预测失败 → 稳定性下降
+    this.state.stability = Math.max(0.1, Math.min(1,
+      this.state.stability + (1 - predictionError) * 0.1 - predictionError * 0.15
+    ));
+
+    // 更新环境投影
+    if (actualEffect.external !== undefined) {
+      const current = this.state.externalProjection.external || 0;
+      this.state.externalProjection.external = Math.max(-1, Math.min(1, current + actualEffect.external)) as Trit;
+    }
+    if (actualEffect.medial !== undefined) {
+      const current = this.state.externalProjection.medial || 0;
+      this.state.externalProjection.medial = Math.max(-1, Math.min(1, current + actualEffect.medial)) as Trit;
+    }
+
+    // 记录历史
+    this.state.responseHistory.push({ action, delta: actualDelta });
+    if (this.state.responseHistory.length > this.MAX_RESPONSE_HISTORY) {
+      this.state.responseHistory.shift();
+    }
+  }
+
+  /**
+   * 计算环境预测误差（用于自由能计算）
+   * 返回环境维度的预测误差量
+   */
+  computeEnvironmentalPredictionError(action: CognitiveAction): number {
+    const predicted = this.predictEnvironmentalEffect(action);
+    const predictedExternal = predicted.external || 0;
+    const currentExternal = this.state.externalProjection.external || 0;
+    // 预测误差 = 预测变化方向与当前趋势的不一致性
+    const error = Math.abs(predictedExternal - currentExternal * 0.3);
+    return error * (1 - this.state.stability);  // 不稳定时误差权重更大
+  }
+
+  /** 重置环境模型 */
+  reset(): void {
+    this.state = {
+      externalProjection: { external: 0, medial: 0 },
+      stability: 0.5,
+      responseHistory: []
+    };
+  }
+}
 
 /** 认知行动类型 */
 export type CognitiveAction =
@@ -86,6 +268,14 @@ export interface ActiveInferenceOptions {
   transitionPenalty?: number;
   /** 是否考虑历史经验（需要传入历史状态） */
   useHistory?: boolean;
+  /** 精度权重：各维度对自由能的贡献权重（默认等权） */
+  precision?: PrecisionWeights;
+  /** 精度预设名称（覆盖 precision 参数） */
+  precisionPreset?: keyof typeof PRECISION_PRESETS;
+  /** 环境模型实例（传入后启用环境感知自由能） */
+  environment?: EnvironmentalModel;
+  /** 环境预测误差权重（默认 0.2，即环境误差对总自由能贡献 20%） */
+  environmentWeight?: number;
 }
 
 /** 默认自由能阈值 */
@@ -109,8 +299,16 @@ export class ActiveInference {
       freeEnergyThreshold: 0.1,
       transitionPenalty: 0.1,
       useHistory: false,
+      precision: DEFAULT_PRECISION,
+      environment: undefined as EnvironmentalModel | undefined,
+      environmentWeight: 0.2,
       ...options
     };
+
+    // 解析精度权重：预设 > 直接传入 > 默认
+    const precision = opts.precisionPreset
+      ? PRECISION_PRESETS[opts.precisionPreset] || DEFAULT_PRECISION
+      : opts.precision || DEFAULT_PRECISION;
 
     // 1. 确定目标原型
     const currentMatch = PrototypeMatcher.snapTo(currentState);
@@ -118,8 +316,12 @@ export class ActiveInference {
       ? PROTOTYPES.find(p => p.name === opts.targetPrototypeName) || currentMatch.prototype
       : currentMatch.prototype;
 
-    // 2. 当前自由能（当前状态到目标原型的距离）
-    const currentFreeEnergy = CognitiveDistance.composite(currentState, targetPrototype.vector);
+    // 2. 当前自由能（精度加权复合距离）
+    const currentFreeEnergy = ActiveInference.precisionWeightedDistance(
+      currentState, targetPrototype.vector, precision
+    );
+
+    // 2b. 环境模型存在时，环境误差在候选评估中计算
 
     // 3. 如果当前自由能已低于阈值，选择"保持"
     if (currentFreeEnergy <= opts.freeEnergyThreshold) {
@@ -145,28 +347,49 @@ export class ActiveInference {
     // 4. 生成候选行动
     const candidates = ActiveInference.generateCandidates(currentState, history, opts);
 
-    // 5. 评估每个候选行动
+    // 5. 评估每个候选行动（精度加权 + 环境感知）
     const evaluations = candidates.map(candidate => {
       const predictedState = ActiveInference.predictTransition(currentState, candidate, history, opts);
-      const freeEnergy = CognitiveDistance.composite(predictedState, targetPrototype.vector);
-      const transitionDistance = CognitiveDistance.composite(currentState, predictedState);
 
-      // 总自由能 = 目标距离 + 变化幅度惩罚
-      const totalFreeEnergy = freeEnergy + transitionDistance * opts.transitionPenalty;
+      // 精度加权自由能：各维度按精度权重计算预测误差
+      const cognitiveFreeEnergy = ActiveInference.precisionWeightedDistance(
+        predictedState, targetPrototype.vector, precision
+      );
+      const transitionDistance = ActiveInference.precisionWeightedDistance(
+        currentState, predictedState, precision
+      );
+
+      // 环境预测误差
+      let envFreeEnergy = 0;
+      if (opts.environment) {
+        envFreeEnergy = opts.environment.computeEnvironmentalPredictionError(candidate);
+      }
+
+      // 总自由能 = 精度加权认知距离 + 变化幅度惩罚 + 环境预测误差
+      const totalFreeEnergy = cognitiveFreeEnergy
+        + transitionDistance * opts.transitionPenalty
+        + envFreeEnergy * opts.environmentWeight;
 
       return {
         action: candidate,
         predictedState,
         freeEnergy: totalFreeEnergy,
         transitionDistance,
-        confidence: ActiveInference.computeConfidence(currentState, predictedState, targetPrototype, freeEnergy),
-        reason: ActiveInference.explainAction(candidate, freeEnergy, transitionDistance, targetPrototype)
+        confidence: ActiveInference.computeConfidence(currentState, predictedState, targetPrototype, cognitiveFreeEnergy),
+        reason: ActiveInference.explainAction(candidate, totalFreeEnergy, transitionDistance, targetPrototype,
+          envFreeEnergy > 0 ? `，环境误差=${envFreeEnergy.toFixed(3)}` : '')
       };
     });
 
     // 6. 选择自由能最低的行动
     evaluations.sort((a, b) => a.freeEnergy - b.freeEnergy);
     const best = evaluations[0];
+
+    // 7. 如果有环境模型，更新环境状态
+    if (opts.environment) {
+      const predictedEffect = opts.environment.predictEnvironmentalEffect(best.action);
+      opts.environment.update(best.action, predictedEffect);
+    }
 
     return {
       currentState,
@@ -178,6 +401,32 @@ export class ActiveInference {
       freeEnergyReduction: currentFreeEnergy - best.freeEnergy,
       confidence: best.confidence
     };
+  }
+
+  /**
+   * 精度加权距离：各维度按精度权重计算复合距离
+   *
+   * F = Σ_d  π_d · |s_d - t_d|  /  Σ_d π_d
+   *
+   * 精度高的维度对距离贡献更大，精度低的维度被衰减。
+   * 这使认知系统能"聚焦"于当前最关键的维度。
+   */
+  private static precisionWeightedDistance(
+    source: TritVector,
+    target: TritVector,
+    precision: PrecisionWeights
+  ): number {
+    let weightedSum = 0;
+    let totalWeight = 0;
+
+    for (const d of ALL_DIMENSIONS) {
+      const w = precision[d] || 1;
+      const diff = Math.abs(source[d] - target[d]);
+      weightedSum += w * diff;
+      totalWeight += w;
+    }
+
+    return totalWeight > 0 ? weightedSum / totalWeight : 0;
   }
 
   /**
@@ -294,7 +543,8 @@ export class ActiveInference {
     action: CognitiveAction,
     freeEnergy: number,
     transitionDistance: number,
-    target: CognitivePrototype
+    target: CognitivePrototype,
+    suffix: string = ''
   ): string {
     const actionLabels: Record<CognitiveAction, string> = {
       expand: '向扩张态推进',
@@ -305,7 +555,7 @@ export class ActiveInference {
       hold: '保持当前状态'
     };
 
-    return `${actionLabels[action]}，预期自由能=${freeEnergy.toFixed(3)}，变化幅度=${transitionDistance.toFixed(3)}，目标=${target.name}`;
+    return `${actionLabels[action]}，预期自由能=${freeEnergy.toFixed(3)}，变化幅度=${transitionDistance.toFixed(3)}，目标=${target.name}${suffix}`;
   }
 
   /**

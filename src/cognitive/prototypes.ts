@@ -306,3 +306,212 @@ export function limitCycleSnapshot(
     recommendation: PrototypeMatcher.recommendAction(current)
   };
 }
+
+/**
+ * 原型发现器 (Prototype Discovery)
+ * ─────────────────────────────────────────────────────────────
+ *
+ * 从认知历史轨迹中发现新的"吸引子"——即系统反复回到的稳定状态。
+ *
+ * 预定义的五大原型（扩张/收缩/观察/转化/创生）覆盖了基本认知态势，
+ * 但实际运行中，系统可能在特定的复合状态下形成稳定的"个性化吸引子"。
+ *
+ * 发现算法：
+ *   1. 频率统计：统计历史中每个卦象索引出现的频次
+ *   2. 稳定性过滤：只保留在时间窗口内反复出现（≥ minOccurrences）的状态
+ *   3. 去重：排除与已知原型过于接近（距离 < noveltyThreshold）的状态
+ *   4. 聚类合并：将距离很近的频繁状态合并为一个发现的原型
+ *   5. 行动推断：根据发现的原型向量特征，推断其行动提示
+ *
+ * 发现的原型可以动态注册到系统中，使认知系统具备"经验学习"能力：
+ *   随着运行时间增长，系统会识别出自己独有的认知模式。
+ */
+export interface DiscoveredPrototype extends CognitivePrototype {
+  /** 发现来源：从历史轨迹中学习 */
+  discovered: true;
+  /** 出现频次 */
+  frequency: number;
+  /** 平均停留时间（连续出现的步数） */
+  avgDwellTime: number;
+  /** 首次发现时间 */
+  firstSeen: number;
+}
+
+export class PrototypeDiscovery {
+  /** 已发现的原型缓存 */
+  private static discovered: DiscoveredPrototype[] = [];
+
+  /**
+   * 从历史轨迹中发现新的认知原型（吸引子）
+   *
+   * @param history  认知状态历史
+   * @param options  发现参数
+   * @returns  新发现的原型列表（不含已知的）
+   */
+  static discover(
+    history: TritVector[],
+    options: {
+      /** 最小出现次数（低于此值不视为吸引子） */
+      minOccurrences?: number;
+      /** 新颖性阈值：与已知原型距离 ≥ 此值才视为"新"发现 */
+      noveltyThreshold?: number;
+      /** 聚类合并阈值：距离 < 此值的频繁状态合并 */
+      mergeThreshold?: number;
+      /** 最大发现数量 */
+      maxDiscoveries?: number;
+    } = {}
+  ): DiscoveredPrototype[] {
+    const opts = {
+      minOccurrences: 3,
+      noveltyThreshold: 0.25,
+      mergeThreshold: 0.15,
+      maxDiscoveries: 5,
+      ...options
+    };
+
+    if (history.length < opts.minOccurrences) {
+      return [];
+    }
+
+    // 1. 频率统计：按卦象索引分组
+    const indexFreq = new Map<number, { vectors: TritVector[]; count: number; indices: number[] }>();
+    for (let i = 0; i < history.length; i++) {
+      const v = history[i];
+      const idx = TritVectorOps.toHexagramIndex(v);
+      const entry = indexFreq.get(idx) || { vectors: [], count: 0, indices: [] };
+      entry.vectors.push(v);
+      entry.count++;
+      entry.indices.push(i);
+      indexFreq.set(idx, entry);
+    }
+
+    // 2. 稳定性过滤：只保留出现次数 ≥ minOccurrences 的状态
+    const frequent = Array.from(indexFreq.entries())
+      .filter(([, info]) => info.count >= opts.minOccurrences)
+      .map(([idx, info]) => ({
+        hexagramIndex: idx,
+        vector: info.vectors[0],  // 取第一个代表
+        count: info.count,
+        indices: info.indices
+      }));
+
+    // 3. 去重：排除与已知原型过于接近的状态
+    const novel = frequent.filter(item => {
+      const match = PrototypeMatcher.snapTo(item.vector);
+      return match.distance >= opts.noveltyThreshold;
+    });
+
+    // 同时排除与已发现原型过于接近的
+    const trulyNovel = novel.filter(item => {
+      return PrototypeDiscovery.discovered.every(dp => {
+        const dist = CognitiveDistance.composite(item.vector, dp.vector);
+        return dist >= opts.mergeThreshold;
+      });
+    });
+
+    // 4. 计算停留时间并创建发现的原型
+    const discoveries: DiscoveredPrototype[] = trulyNovel.map(item => {
+      // 计算平均停留时间：连续出现的平均步数
+      let totalDwell = 0;
+      let dwellEpisodes = 0;
+      let currentDwell = 1;
+      for (let i = 1; i < item.indices.length; i++) {
+        if (item.indices[i] === item.indices[i - 1] + 1) {
+          currentDwell++;
+        } else {
+          totalDwell += currentDwell;
+          dwellEpisodes++;
+          currentDwell = 1;
+        }
+      }
+      totalDwell += currentDwell;
+      dwellEpisodes++;
+      const avgDwellTime = totalDwell / dwellEpisodes;
+
+      return {
+        name: `发现态-${item.hexagramIndex}`,
+        description: `从历史轨迹中发现的认知吸引子（频次=${item.count}，平均停留=${avgDwellTime.toFixed(1)}步）`,
+        vector: item.vector,
+        actionHint: PrototypeDiscovery.inferActionHint(item.vector),
+        element: PrototypeDiscovery.inferElement(item.vector),
+        hexagramIndex: item.hexagramIndex,
+        discovered: true,
+        frequency: item.count,
+        avgDwellTime,
+        firstSeen: Date.now()
+      };
+    });
+
+    // 5. 限制数量
+    discoveries.sort((a, b) => b.frequency - a.frequency);
+    const top = discoveries.slice(0, opts.maxDiscoveries);
+
+    // 注册到缓存
+    PrototypeDiscovery.discovered.push(...top);
+    // 去重缓存
+    const seen = new Set<string>();
+    PrototypeDiscovery.discovered = PrototypeDiscovery.discovered.filter(dp => {
+      const key = dp.hexagramIndex.toString();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return top;
+  }
+
+  /**
+   * 获取所有已发现的原型（含本次会话之前的）
+   */
+  static getDiscovered(): DiscoveredPrototype[] {
+    return [...PrototypeDiscovery.discovered];
+  }
+
+  /**
+   * 获取所有原型（预定义 + 已发现）
+   */
+  static getAllPrototypes(): CognitivePrototype[] {
+    return [...PROTOTYPES, ...PrototypeDiscovery.discovered];
+  }
+
+  /**
+   * 清除已发现的原型缓存
+   */
+  static clearDiscovered(): void {
+    PrototypeDiscovery.discovered = [];
+  }
+
+  /**
+   * 根据向量特征推断行动提示
+   */
+  private static inferActionHint(vector: TritVector): CognitivePrototype['actionHint'] {
+    const majority = TritVectorOps.majority(vector);
+    if (majority === 1) return 'expand';
+    if (majority === -1) return 'contract';
+
+    // 全 0 或混合 → 进一步判断
+    const arr = TritVectorOps.toArray(vector);
+    const hasConflict = arr.some((v, i) => i < 3 && v === 1) && arr.some((v, i) => i >= 3 && i < 6 && v === -1);
+    if (hasConflict) return 'transform';
+
+    const hasCondition = vector.condition === 1 && vector.effect === 0;
+    if (hasCondition) return 'create';
+
+    return 'observe';
+  }
+
+  /**
+   * 根据向量特征推断五行属性
+   */
+  private static inferElement(vector: TritVector): CognitivePrototype['element'] {
+    const hint = PrototypeDiscovery.inferActionHint(vector);
+    const map: Record<string, CognitivePrototype['element']> = {
+      expand: '木',
+      contract: '金',
+      observe: '水',
+      transform: '火',
+      create: '土'
+    };
+    return map[hint] || '土';
+  }
+}
