@@ -1,56 +1,97 @@
 # TC-AGI Architecture
 
-## Overview
+## Autonomous Cognitive Life Architecture
 
-TC-AGI is designed as a layered ternary cognitive architecture. The system models cognition through discrete three-state information units and higher-order self-organizing structures.
+TC-AGI explores a layered architecture for autonomous cognitive systems by combining existence constraints, self-modeling, world understanding, reasoning, action and evolution.
+
+## Cognitive Life Cycle
+
+```
+Existence
+    ↓
+Identity
+    ↓
+Perception
+    ↓
+World Model
+    ↓
+Reasoning
+    ↓
+Decision
+    ↓
+Action
+    ↓
+Feedback
+    ↓
+Memory
+    ↓
+Evolution
+```
+
+## Architecture Layers
+
+```
+                 Existence Kernel
+                         |
+                         ↓
+                   Axiom Engine
+                         |
+                         ↓
+                    Identity OS
+                         |
+                         ↓
+              Cognitive State Field
+                         |
+          ┌──────────────┴──────────────┐
+          ↓                             ↓
+       Memory OS                   World Model
+          ↓                             ↓
+   Experience / Knowledge       Entity Representation
+          └──────────→ Causal Engine ←──┘
+                         |
+                         ↓
+                Simulation Engine
+                         |
+                         ↓
+              Autonomous Decision
+                         |
+                         ↓
+                 Evolution Layer
+```
 
 ## Core Principles
 
-### 1. Ternary Cognitive Representation
+### Ternary Cognitive Representation
 
-Each cognitive unit contains three fundamental states:
+The system explores three-state cognitive representations and dynamic state transitions.
 
-- Positive activation
-- Neutral/context state
-- Negative inhibition
+### Self Model + World Model
 
-The goal is not simple ternary encoding, but dynamic cognitive state transition.
+Autonomous cognition requires both:
 
-### 2. Cognitive Unit Model
+- understanding internal identity
+- representing external reality
 
-A cognitive unit consists of:
+### Causal Understanding
 
-```
-Input State
-    |
-Transformation Function
-    |
-Memory Context
-    |
-Output State
-```
+The architecture moves beyond observation toward discovering relationships, invariants and possible future states.
 
-### 3. Cognitive Hierarchy
+### Controlled Evolution
+
+Self-improvement must preserve core constraints and identity continuity.
+
+## Research Direction
+
+The long-term direction:
 
 ```
-Ternary Unit
-      |
-Cognitive Layer
-      |
-Reasoning Network
-      |
-Self Model
-      |
-Distributed AGI System
+Map the world
+    ↓
+Understand the world
+    ↓
+Discover patterns
+    ↓
+Simulate futures
+    ↓
+Adapt through experience
 ```
-
-## V0.1 Implementation Goal
-
-Build the smallest executable cognitive primitive capable of:
-
-- ternary state representation
-- state transition
-- memory attachment
-- evaluation feedback
-
-Future versions will expand toward cognitive transformers and autonomous agent systems.
