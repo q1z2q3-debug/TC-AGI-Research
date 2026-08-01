@@ -1,8 +1,8 @@
 /**
  * 全局类型定义
+ *
+ * 注意：MemoryType 已迁移至 memory/memory-types.ts，此处不再重复定义。
  */
-
-export type MemoryType = 'user' | 'feedback' | 'topic' | 'reference';
 
 export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 

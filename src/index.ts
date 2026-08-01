@@ -15,9 +15,8 @@ export * from './cognitive';
 export type { CognitiveState, CognitiveSnapshot } from './cognitive/cognitive-space';
 export type { ActionStrategy, TaskResult } from './cognitive/deepseek-cognize';
 
-// 记忆层导出
+// 记忆层导出（memory-types 为唯一类型来源，通过 ./memory 统一导出）
 export * from './memory';
-export type { MemoryQuery, MemoryStats } from './memory/memory-types';
 
 // 核心层导出
 export * from './core';

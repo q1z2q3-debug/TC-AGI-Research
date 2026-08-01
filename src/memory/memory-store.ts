@@ -3,7 +3,7 @@
  * 支持 IndexedDB（浏览器）和 本地文件（Node.js 环境）
  */
 
-import { Memory } from './memory-system';
+import { Memory } from './memory-types';
 
 // 浏览器环境全局（Node 构建时无 DOM lib，这里做最小化环境声明）
 declare const window: any;

@@ -122,8 +122,8 @@ export class NullEngine {
       creationTrace.push(sensingVector);
 
       // ═══ 阶段3: 聚形 ═══
-      // 根据需求和记忆生成技能蓝图
-      const blueprint = this.generateBlueprint(request, relevantMemories);
+      // 根据需求和记忆生成技能蓝图（LLM 增强或规则推断）
+      const blueprint = await this.generateBlueprint(request, relevantMemories);
 
       // 聚形态：因缘开始汇聚
       const formingVector = TritVectorOps.fromArray([0, 1, 1, 1, 1, 0, 1, 1, 0]);
@@ -232,11 +232,15 @@ export class NullEngine {
    *
    * 如果有 LLM，使用 LLM 生成更精确的技能逻辑；
    * 否则使用规则推断生成基础技能。
+   *
+   * 修复：原先 generateBlueprint 不是 async 方法，LLM 调用未 await，
+   *      导致即使配置了 LLM 也永远走规则推断路径。
+   *      现改为 async 方法并正确 await LLM 调用。
    */
-  private generateBlueprint(
+  private async generateBlueprint(
     request: SkillCreationRequest,
     memories: any[]
-  ): SkillBlueprint {
+  ): Promise<SkillBlueprint> {
     const skillName = request.missingSkillName || this.inferSkillName(request.goal);
 
     // 如果有 LLM，尝试用 LLM 生成更精确的技能描述和逻辑
@@ -256,12 +260,18 @@ export class NullEngine {
 缺失技能: ${request.missingSkillName}
 相关记忆: ${memories.map(m => m.content?.slice(0, 200) || '').join('; ')}`;
 
-        const raw = this.deps.llmComplete(systemPrompt, userPrompt);
-        // 注意：这里不 await，因为 generateBlueprint 不是 async
-        // LLM 调用在 createSkill 的异步上下文中，但 generateBlueprint 是同步的
-        // 所以我们只在能同步获得结果时使用，否则回退到规则推断
+        const raw = await this.deps.llmComplete(systemPrompt, userPrompt);
+        const parsed = JSON.parse(raw) as Partial<SkillBlueprint>;
+        if (parsed && parsed.name && parsed.description) {
+          return {
+            name: parsed.name,
+            description: parsed.description,
+            instructions: parsed.instructions || `根据目标执行: ${request.goal}`,
+            executeLogic: parsed.executeLogic || 'generic'
+          };
+        }
       } catch {
-        // LLM 调用失败，回退到规则推断
+        // LLM 调用失败或解析失败，回退到规则推断
       }
     }
 

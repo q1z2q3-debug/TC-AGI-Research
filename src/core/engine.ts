@@ -462,6 +462,16 @@ export class EngineLayer {
         }
       }
 
+      // 标记因依赖未满足而被跳过的步骤
+      // 修复：原先这些步骤保持 pending，导致 allDoneSteps 永远为 false，计划状态卡在 running
+      for (const step of plan.steps) {
+        if (step.status === 'pending') {
+          step.status = 'error';
+          step.error = '依赖未满足，步骤被跳过';
+          errors.push(`步骤 ${step.id} 被跳过: 依赖未满足`);
+        }
+      }
+
       // 更新计划状态
       const hasError = plan.steps.some(s => s.status === 'error');
       const allDoneSteps = plan.steps.every(s => s.status === 'done' || s.status === 'error');

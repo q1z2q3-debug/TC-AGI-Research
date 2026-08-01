@@ -12,31 +12,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { contentHexagram, contentToTritVector } from '../cognitive/semantic';
 import { CognitiveDistance } from '../cognitive/distance';
 import { TritVector, TritVectorOps } from '../cognitive/trit-vector';
+import { Memory, MemoryQuery, MemoryStats } from './memory-types';
 
-export interface Memory {
-  id: string;
-  type: 'user' | 'feedback' | 'topic' | 'reference';
-  name: string;
-  content: string;
-  tags: string[];
-  hexagramIndex: number;
-  /** 认知向量（用于三元距离检索） */
-  tritVector: TritVector;
-  piDepth: number;
-  eWeight: number;
-  timestamp: number;
-  accessCount: number;
-  lastAccess: number;
-  importance: number; // 0~1
-}
-
-export interface MemoryQuery {
-  query?: string;
-  type?: 'user' | 'feedback' | 'topic' | 'reference';
-  tags?: string[];
-  limit?: number;
-  minImportance?: number;
-}
+export { Memory, MemoryQuery };
 
 export class MemorySystem {
   private store: MemoryStore;
@@ -252,29 +230,43 @@ export class MemorySystem {
   }
 
   /**
-   * 统计信息
+   * 统计信息（返回 MemoryStats 统一类型）
+   *
+   * 升级：返回 memory-types.ts 中定义的 MemoryStats，
+   *      包含 avgPiDepth/avgEWeight/mostActiveTags 等完整字段。
    */
-  getStats(): {
-    total: number;
-    byType: Record<string, number>;
-    avgImportance: number;
-    totalAccesses: number;
-  } {
+  getStats(): MemoryStats {
     const byType: Record<string, number> = {};
-    let totalImportance = 0;
-    let totalAccesses = 0;
+    let totalPiDepth = 0;
+    let totalEWeight = 0;
+    const tagCounts: Record<string, number> = {};
+    let oldestTimestamp = Date.now();
+    let newestTimestamp = 0;
 
     for (const m of this.memories) {
       byType[m.type] = (byType[m.type] || 0) + 1;
-      totalImportance += m.importance;
-      totalAccesses += m.accessCount;
+      totalPiDepth += m.piDepth;
+      totalEWeight += m.eWeight;
+      if (m.timestamp < oldestTimestamp) oldestTimestamp = m.timestamp;
+      if (m.timestamp > newestTimestamp) newestTimestamp = m.timestamp;
+      for (const tag of m.tags) {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      }
     }
+
+    const mostActiveTags = Object.entries(tagCounts)
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
 
     return {
       total: this.memories.length,
-      byType,
-      avgImportance: this.memories.length > 0 ? totalImportance / this.memories.length : 0,
-      totalAccesses
+      byType: byType as MemoryStats['byType'],
+      avgPiDepth: this.memories.length > 0 ? totalPiDepth / this.memories.length : 0,
+      avgEWeight: this.memories.length > 0 ? totalEWeight / this.memories.length : 0,
+      mostActiveTags,
+      oldestTimestamp: this.memories.length > 0 ? oldestTimestamp : 0,
+      newestTimestamp
     };
   }
 

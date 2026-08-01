@@ -1,7 +1,14 @@
 /**
- * 记忆系统类型定义
+ * 记忆系统类型定义（唯一事实来源）
+ * ─────────────────────────────────────────────────────────────
+ *
  * 三元索引：卦象索引(0~19682) + π展开深度(1~10) + e呼吸相位权重(0~1)
+ * 认知向量：TritVector（用于三元距离检索）
+ *
+ * 统一了原先在 memory-system.ts 和 memory-types.ts 中重复定义的 Memory 接口。
  */
+
+import { TritVector } from '../cognitive/trit-vector';
 
 export type MemoryType = 'user' | 'feedback' | 'topic' | 'reference';
 
@@ -15,10 +22,13 @@ export interface Memory {
   hexagramIndex: number;   // 0~19682 卦象索引
   piDepth: number;         // 1~10 π展开深度
   eWeight: number;         // 0~1 e呼吸相位权重
+  // 认知向量（用于三元距离检索）
+  tritVector: TritVector;
   // 元数据
   timestamp: number;
   accessCount: number;
   lastAccess: number;
+  importance: number;      // 0~1
   // 来源追踪
   source?: string;
   sourceUrl?: string;
@@ -32,6 +42,7 @@ export interface MemoryQuery {
   piDepth?: number;
   minEWeight?: number;
   maxEWeight?: number;
+  minImportance?: number;
   limit?: number;
   offset?: number;
   sortBy?: 'timestamp' | 'accessCount' | 'eWeight' | 'hexagramIndex';

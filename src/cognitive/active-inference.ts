@@ -182,21 +182,16 @@ export class ActiveInference {
 
   /**
    * 生成候选行动列表
+   *
+   * 返回所有六种认知行动作为候选。
+   * 原型推荐在评估阶段自然会产生更低的自由能，无需在此预先排序。
    */
   private static generateCandidates(
     currentState: TritVector,
     history: TritVector[],
     opts: ActiveInferenceOptions
   ): CognitiveAction[] {
-    const candidates: CognitiveAction[] = ['expand', 'contract', 'observe', 'transform', 'create', 'hold'];
-
-    // 基于原型推荐添加优先候选
-    const recommendation = PrototypeMatcher.recommendAction(currentState);
-    if (!candidates.includes(recommendation.action)) {
-      candidates.unshift(recommendation.action);
-    }
-
-    return candidates;
+    return ['expand', 'contract', 'observe', 'transform', 'create', 'hold'];
   }
 
   /**
