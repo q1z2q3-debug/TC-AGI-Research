@@ -26,3 +26,20 @@ export interface AGIConfig {
     tasks: any[];
   };
 }
+
+export interface AgentContext {
+  sessionId: string;
+  userId?: string;
+  timestamp: number;
+  task?: string;
+  parameters?: Record<string, any>;
+}
+
+export interface ActionResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  metadata?: Record<string, any>;
+}
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
