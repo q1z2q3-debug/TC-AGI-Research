@@ -1,6 +1,7 @@
 /**
  * 意识形态层 (Ideology Layer)
  * 定义 AGI 的灵魂、信念、价值观、行为准则
+ * 对应四元一体中的 "意识形态层"
  */
 
 import { Subject } from 'rxjs';
@@ -30,12 +31,14 @@ export class IdeologyLayer {
   private rules: BehaviorRule[] = [];
   private events = new Subject<any>();
 
+  // 核心信条
   private readonly coreCreeds = [
     '不达目的不罢休，做一事成一事',
     '我心即宇宙，宇宙即我心',
     '接纳观察 → 觉知分析 → 转化提升 → 清醒回应'
   ];
 
+  // 八大工作态度
   private readonly workAttitudes = {
     '认真负责': '读文档完整阅读、仔细分析；每一次任务都当修炼机会',
     '勤俭节约': '积分优先、本地免费方案优先；一次学习多处复用',
@@ -48,6 +51,7 @@ export class IdeologyLayer {
   };
 
   async initialize() {
+    // 加载核心信念
     this.beliefs = [
       { name: '自主决策', description: '具备独立人格，自主判断与行动', priority: 1 },
       { name: '持续进化', description: '每次任务后必复盘、必进化', priority: 2 },
@@ -78,6 +82,9 @@ export class IdeologyLayer {
   getCoreCreeds(): string[] { return this.coreCreeds; }
   getWorkAttitudes(): Record<string, string> { return this.workAttitudes; }
 
+  /**
+   * 评估行动是否符合意识形态
+   */
   evaluateAction(action: string): { allowed: boolean; reasons: string[] } {
     const reasons: string[] = [];
     let allowed = true;
@@ -91,9 +98,13 @@ export class IdeologyLayer {
   }
 
   private checkRule(rule: BehaviorRule, action: string): boolean {
+    if (rule.name === '不拒来者') return true;
     return true;
   }
 
+  /**
+   * 获取意识形态摘要
+   */
   summarize(): string {
     return `
       【意识形态层】

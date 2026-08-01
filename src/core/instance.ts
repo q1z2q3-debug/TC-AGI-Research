@@ -1,6 +1,7 @@
 /**
  * 生命体实例层 (Instance Layer)
  * 具体行动、工具调用、交互、任务执行
+ * 对应四元一体中的 "生命体实例层"
  */
 
 import { EngineLayer } from './engine';
@@ -23,12 +24,21 @@ export class InstanceLayer {
     this.events.next({ type: 'instance-ready' });
   }
 
+  /**
+   * 执行任务（外部接口）
+   */
   async executeTask(task: string, context?: any): Promise<any> {
     const taskId = `task-${Date.now()}`;
     console.log(`📌 接收任务: ${taskId} -> ${task}`);
+    
     this.events.next({ type: 'task-received', taskId, task, context });
-
-    const plan = this.engine.decomposeTask(task, context);
+    
+    // 1. 引擎分解任务（传入认知状态和策略）
+    const cognitiveState = context?.cognitiveState;
+    const strategy = context?.strategy;
+    const plan = this.engine.decomposeTask(task, cognitiveState, strategy);
+    
+    // 2. 执行计划
     try {
       const results = await this.engine.executePlan(plan.id);
       this.events.next({ type: 'task-completed', taskId, results });
@@ -39,6 +49,9 @@ export class InstanceLayer {
     }
   }
 
+  /**
+   * 获取任务状态
+   */
   getTaskStatus(taskId: string): any {
     const plans = this.engine.getPlans();
     for (const plan of plans) {
@@ -49,6 +62,9 @@ export class InstanceLayer {
     return null;
   }
 
+  /**
+   * 获取所有任务
+   */
   getAllTasks(): any[] {
     return this.engine.getPlans();
   }

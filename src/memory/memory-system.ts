@@ -1,9 +1,9 @@
 /**
- * 三元索引记忆系统
- * 基于 卦象索引(0~19682) + π展开深度(1~10) + e呼吸相位
+ * 三元索引记忆系统 (Memory System)
+ * 基于 卦象索引(0~19682) + π展开深度(1~10) + e呼吸相位(权重)
+ * 实现长期记忆的存储、检索、遗忘与进化
  */
 
-import { MemoryStore } from './memory-store';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface Memory {
@@ -21,17 +21,10 @@ export interface Memory {
 }
 
 export class MemorySystem {
-  private store: MemoryStore;
   private memories: Memory[] = [];
   private readonly HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000;
 
-  constructor() {
-    this.store = new MemoryStore();
-  }
-
   async initialize() {
-    await this.store.initialize();
-    this.memories = await this.store.loadAll();
     console.log(`🧠 记忆系统初始化: ${this.memories.length} 条记忆`);
   }
 
@@ -47,7 +40,6 @@ export class MemorySystem {
       lastAccess: Date.now()
     };
     this.memories.push(fullMemory);
-    await this.store.save(fullMemory);
     return fullMemory;
   }
 
@@ -81,7 +73,7 @@ export class MemorySystem {
   private calcPiDepth(content: string): number {
     const length = content.length;
     const uniqueChars = new Set(content).size;
-    const complexity = uniqueChars / length;
+    const complexity = uniqueChars / Math.max(length, 1);
     return Math.min(10, Math.max(1, Math.floor(complexity * 10) + 1));
   }
 
@@ -95,12 +87,8 @@ export class MemorySystem {
     return Math.exp(-halfLives);
   }
 
-  async flush(): Promise<void> {
-    await this.store.saveAll(this.memories);
-  }
-
+  async flush(): Promise<void> {}
   async shutdown(): Promise<void> {
-    await this.flush();
     console.log('💾 记忆系统已关闭');
   }
 

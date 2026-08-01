@@ -1,6 +1,12 @@
 /**
  * DeepSeekCognize 认知循环
  * 觉知 → 推理 → 进化 → 自知
+ *
+ * 四步闭环：
+ * 1. 觉知 (perceive): 输入 → Trit分解 → 卦象坐标 → π/e调节
+ * 2. 推理 (reason): 基于认知状态 → 派生行动策略
+ * 3. 进化 (evolve): 任务结果反馈 → 调整认知向量
+ * 4. 自知 (get_state): 返回完整认知态势快照
  */
 
 import { CognitiveSpace, CognitiveState, CognitiveSnapshot } from './cognitive-space';

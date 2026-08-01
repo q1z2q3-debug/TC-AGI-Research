@@ -143,7 +143,7 @@ export class CognitiveSpace {
 
   private calcPiDepth(input: string): number {
     const length = input.length;
-    const uniqueRatio = new Set(input).size / length;
+    const uniqueRatio = new Set(input).size / Math.max(length, 1);
     const complexity = Math.min(1, (length / 200) * 0.5 + uniqueRatio * 0.5);
     return Math.max(1, Math.min(10, Math.floor(complexity * 10) + 1));
   }

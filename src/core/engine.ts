@@ -1,6 +1,7 @@
 /**
  * 研究引擎层 (Engine Layer)
  * 负责推理、学习、决策、任务分解与规划
+ * 受认知空间层指导
  */
 
 import { IdeologyLayer } from './ideology';
@@ -10,15 +11,6 @@ import { MCPAdapter } from '../tools/mcp-adapter';
 import { CronScheduler } from '../scheduler/cron-scheduler';
 import { Subject } from 'rxjs';
 
-export interface TaskPlan {
-  id: string;
-  goal: string;
-  steps: TaskStep[];
-  priority: number;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  createdAt: Date;
-}
-
 export interface TaskStep {
   id: string;
   description: string;
@@ -27,6 +19,17 @@ export interface TaskStep {
   parameters?: any;
   dependencies?: string[];
   status: 'pending' | 'running' | 'done' | 'error';
+}
+
+export interface TaskPlan {
+  id: string;
+  goal: string;
+  steps: TaskStep[];
+  priority: number;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  createdAt: Date;
+  cognitiveState?: any; // 关联认知状态
+  strategy?: any;       // 关联策略
 }
 
 export class EngineLayer {
@@ -57,13 +60,17 @@ export class EngineLayer {
     this.events.next({ type: 'engine-ready' });
   }
 
-  decomposeTask(goal: string, context?: any): TaskPlan {
+  /**
+   * 任务分解：将高层目标拆解为可执行步骤，结合认知策略
+   */
+  decomposeTask(goal: string, cognitiveState?: any, strategy?: any): TaskPlan {
     const ideologySummary = this.ideology.summarize();
     const memories = this.memory.retrieve(goal);
     const skills = this.skillLoader.getAvailableSkills();
     const tools = this.mcp.getAvailableTools();
 
-    const steps: TaskStep[] = this.generateSteps(goal, skills, tools);
+    // 生成步骤
+    const steps: TaskStep[] = this.generateSteps(goal, skills, tools, strategy);
 
     const plan: TaskPlan = {
       id: `plan-${Date.now()}`,
@@ -71,7 +78,9 @@ export class EngineLayer {
       steps,
       priority: 1,
       status: 'pending',
-      createdAt: new Date()
+      createdAt: new Date(),
+      cognitiveState,
+      strategy
     };
 
     this.currentPlans.set(plan.id, plan);
@@ -79,20 +88,26 @@ export class EngineLayer {
     return plan;
   }
 
-  private generateSteps(goal: string, skills: string[], tools: string[]): TaskStep[] {
+  private generateSteps(goal: string, skills: string[], tools: string[], strategy?: any): TaskStep[] {
     const steps: TaskStep[] = [];
+    
+    // 步骤1：信息收集
     steps.push({
       id: `step-${Date.now()}-1`,
       description: '分析目标并检索相关记忆',
       skill: 'memory-retrieve',
       status: 'pending'
     });
+
+    // 步骤2：执行主要任务
     steps.push({
       id: `step-${Date.now()}-2`,
       description: '执行主要任务',
       status: 'pending',
       dependencies: ['step-1']
     });
+
+    // 步骤3：验证与复盘
     steps.push({
       id: `step-${Date.now()}-3`,
       description: '验证结果并提取经验',
@@ -100,9 +115,13 @@ export class EngineLayer {
       status: 'pending',
       dependencies: ['step-2']
     });
+
     return steps;
   }
 
+  /**
+   * 执行任务计划
+   */
   async executePlan(planId: string): Promise<any> {
     const plan = this.currentPlans.get(planId);
     if (!plan) throw new Error(`Plan ${planId} not found`);
@@ -153,6 +172,7 @@ export class EngineLayer {
         return await tool.execute(step.parameters || {});
       }
     }
+    // 通用执行
     return { step: step.id, status: 'done', result: 'executed' };
   }
 
