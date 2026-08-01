@@ -1,6 +1,6 @@
 {
   "name": "tc-agi-research",
-  "version": "0.4.0-cognitive-upgrade",
+  "version": "0.5.0-deep-evolution",
   "description": "四元一体 AGI 生命体——意识形态层、认知空间层、研究引擎层、生命体实例层",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
