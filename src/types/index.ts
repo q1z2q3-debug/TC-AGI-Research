@@ -4,6 +4,8 @@
 
 export type MemoryType = 'user' | 'feedback' | 'topic' | 'reference';
 
+export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
 export interface AGIConfig {
   name: string;
   version: string;
@@ -14,6 +16,7 @@ export interface AGIConfig {
   memory: {
     path: string;
     halfLifeDays: number;
+    maxMemories: number;
   };
   skills: {
     sources: string[];
@@ -25,21 +28,33 @@ export interface AGIConfig {
   scheduler: {
     tasks: any[];
   };
+  cognitive: {
+    defaultPiDepth: number;
+    defaultEWeight: number;
+    historyLimit: number;
+  };
 }
 
-export interface AgentContext {
-  sessionId: string;
-  userId?: string;
+export interface HealthStatus {
+  healthy: boolean;
+  components: {
+    ideology: boolean;
+    cognitive: boolean;
+    memory: boolean;
+    engine: boolean;
+    instance: boolean;
+    skills: boolean;
+    tools: boolean;
+    scheduler: boolean;
+  };
+  message?: string;
+  uptime?: number;
+}
+
+export interface LogEntry {
   timestamp: number;
-  task?: string;
-  parameters?: Record<string, any>;
-}
-
-export interface ActionResult {
-  success: boolean;
+  level: 'debug' | 'info' | 'warn' | 'error';
+  source: string;
+  message: string;
   data?: any;
-  error?: string;
-  metadata?: Record<string, any>;
 }
-
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';

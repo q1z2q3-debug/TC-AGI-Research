@@ -1,24 +1,21 @@
 /**
- * MCP 工具适配器 (MCP Adapter)
- * 管理远程或本机 MCP 服务的连接与调用
- * 支持自动执行、超时、重试、降级
+ * MCP 工具适配器
+ * 连接并管理远程或本机 MCP 服务
  */
 
 export interface MCPTool {
   name: string;
   description: string;
-  parameters?: Record<string, any>;
+  parameters: any;
   execute: (params: any) => Promise<any>;
-  timeout?: number;
-  retryCount?: number;
 }
 
 export interface MCPServer {
   name: string;
-  url?: string;
-  command?: string;
-  args?: string[];
-  enabled: boolean;
+  url: string;
+  tools: MCPTool[];
+  status: 'connected' | 'disconnected' | 'error';
+  lastError?: string;
 }
 
 export class MCPAdapter {
@@ -28,182 +25,143 @@ export class MCPAdapter {
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
-
-    // 加载内置工具
-    this.registerBuiltinTools();
-
-    // 加载配置的服务器（示例）
-    // await this.loadServers();
-
+    // 加载默认工具
+    this.registerDefaultTools();
     this.initialized = true;
     console.log(`🔌 MCP适配器初始化: ${this.tools.size} 个工具`);
   }
 
-  private registerBuiltinTools(): void {
+  private registerDefaultTools(): void {
     // 文件操作工具
-    this.tools.set('local_file', {
-      name: 'local_file',
-      description: '本地文件读写操作',
-      parameters: { operation: 'read|write|list', path: 'string', content: 'optional string' },
-      execute: async (params: { operation: string; path: string; content?: string }) => {
-        // 实际实现会调用 local_file_read/write
-        return { status: 'executed', operation: params.operation, path: params.path };
-      },
-      timeout: 10000,
-      retryCount: 2
+    this.tools.set('file-read', {
+      name: 'file-read',
+      description: '读取本地文件',
+      parameters: { path: 'string' },
+      execute: async (params: any) => {
+        // 实际实现需要文件系统 API
+        return { content: `读取文件: ${params.path}`, status: 'simulated' };
+      }
+    });
+
+    this.tools.set('file-write', {
+      name: 'file-write',
+      description: '写入本地文件',
+      parameters: { path: 'string', content: 'string' },
+      execute: async (params: any) => {
+        return { path: params.path, status: 'simulated' };
+      }
     });
 
     // Shell 执行工具
-    this.tools.set('shell', {
-      name: 'shell',
+    this.tools.set('shell-exec', {
+      name: 'shell-exec',
       description: '执行 Shell 命令',
-      parameters: { command: 'string', cwd: 'optional string' },
-      execute: async (params: { command: string; cwd?: string }) => {
-        return { status: 'executed', command: params.command, cwd: params.cwd || '.' };
-      },
-      timeout: 30000,
-      retryCount: 2
+      parameters: { command: 'string' },
+      execute: async (params: any) => {
+        return { command: params.command, stdout: 'simulated output', stderr: '' };
+      }
     });
 
-    // Web 抓取工具
-    this.tools.set('web_fetch', {
-      name: 'web_fetch',
-      description: '抓取网页内容',
-      parameters: { url: 'string' },
-      execute: async (params: { url: string }) => {
-        return { status: 'fetched', url: params.url, content: '模拟网页内容...' };
-      },
-      timeout: 15000,
-      retryCount: 3
+    // HTTP 请求工具
+    this.tools.set('http-request', {
+      name: 'http-request',
+      description: '发送 HTTP 请求',
+      parameters: { url: 'string', method: 'string' },
+      execute: async (params: any) => {
+        try {
+          const response = await fetch(params.url, { method: params.method || 'GET' });
+          const data = await response.text();
+          return { url: params.url, status: response.status, data: data.slice(0, 500) };
+        } catch (e) {
+          return { error: String(e), url: params.url };
+        }
+      }
     });
 
-    // 记忆操作工具
-    this.tools.set('memory', {
-      name: 'memory',
-      description: '记忆系统操作',
-      parameters: { operation: 'save|retrieve|delete', query: 'string' },
-      execute: async (params: { operation: string; query: string }) => {
-        return { status: 'executed', operation: params.operation, query: params.query };
-      },
-      timeout: 5000,
-      retryCount: 1
+    // 数据处理工具
+    this.tools.set('data-transform', {
+      name: 'data-transform',
+      description: '数据转换和处理',
+      parameters: { data: 'any', operation: 'string' },
+      execute: async (params: any) => {
+        return { result: params.data, operation: params.operation, status: 'simulated' };
+      }
     });
   }
 
-  /**
-   * 获取工具
-   */
   getTool(name: string): MCPTool | undefined {
     return this.tools.get(name);
   }
 
-  /**
-   * 获取所有可用工具名
-   */
   getAvailableTools(): string[] {
     return Array.from(this.tools.keys());
   }
 
-  /**
-   * 注册工具
-   */
-  registerTool(tool: MCPTool): void {
-    this.tools.set(tool.name, tool);
-    console.log(`🔧 工具已注册: ${tool.name}`);
+  getAllTools(): MCPTool[] {
+    return Array.from(this.tools.values());
   }
 
   /**
-   * 移除工具
+   * 注册 MCP 服务器
    */
-  unregisterTool(name: string): boolean {
-    return this.tools.delete(name);
-  }
-
-  /**
-   * 添加 MCP 服务器
-   */
-  addServer(server: MCPServer): void {
+  registerServer(server: MCPServer): void {
     this.servers.set(server.name, server);
-    console.log(`🌐 MCP 服务器已添加: ${server.name}`);
+    for (const tool of server.tools) {
+      this.tools.set(tool.name, tool);
+    }
+    console.log(`🔌 注册MCP服务器: ${server.name} (${server.tools.length} 个工具)`);
   }
 
   /**
-   * 移除 MCP 服务器
+   * 连接远程 MCP 服务器
    */
-  removeServer(name: string): boolean {
-    return this.servers.delete(name);
+  async connectServer(name: string, url: string): Promise<void> {
+    try {
+      const response = await fetch(`${url}/tools`);
+      const data = await response.json();
+      const server: MCPServer = {
+        name,
+        url,
+        tools: data.tools || [],
+        status: 'connected'
+      };
+      this.registerServer(server);
+    } catch (e) {
+      const server = this.servers.get(name);
+      if (server) {
+        server.status = 'error';
+        server.lastError = String(e);
+      }
+      console.log(`❌ 连接MCP服务器失败: ${name} - ${e}`);
+    }
   }
 
   /**
-   * 获取所有服务器
+   * 执行工具（带重试）
    */
-  getServers(): MCPServer[] {
-    return Array.from(this.servers.values());
-  }
-
-  /**
-   * 关闭适配器
-   */
-  async shutdown(): Promise<void> {
-    console.log('🔌 MCP适配器关闭');
-    this.tools.clear();
-    this.servers.clear();
-    this.initialized = false;
-  }
-
-  /**
-   * 执行工具（带超时和重试）
-   */
-  async executeTool(name: string, params: any): Promise<any> {
+  async executeTool(name: string, params: any, retries: number = 2): Promise<any> {
     const tool = this.tools.get(name);
     if (!tool) {
-      throw new Error(`工具 ${name} 不存在`);
+      throw new Error(`工具 ${name} 未注册`);
     }
 
-    const maxRetries = tool.retryCount || 1;
-    const timeout = tool.timeout || 10000;
-    let lastError: Error | null = null;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
+    let lastError: any;
+    for (let i = 0; i <= retries; i++) {
       try {
-        // 带超时的执行
-        const result = await this.executeWithTimeout(tool.execute, params, timeout);
-        return result;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (attempt < maxRetries - 1) {
-          console.log(`🔄 工具 ${name} 执行失败，重试 ${attempt + 1}/${maxRetries}...`);
-          await this.delay(1000 * (attempt + 1));
+        return await tool.execute(params);
+      } catch (e) {
+        lastError = e;
+        if (i < retries) {
+          await new Promise(r => setTimeout(r, 1000 * (i + 1)));
         }
       }
     }
-
-    throw new Error(`工具 ${name} 执行失败: ${lastError?.message || '未知错误'}`);
+    throw new Error(`执行工具 ${name} 失败: ${lastError}`);
   }
 
-  private async executeWithTimeout(
-    fn: (params: any) => Promise<any>,
-    params: any,
-    timeout: number
-  ): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        reject(new Error(`执行超时 (${timeout}ms)`));
-      }, timeout);
-
-      fn(params)
-        .then((result) => {
-          clearTimeout(timer);
-          resolve(result);
-        })
-        .catch((error) => {
-          clearTimeout(timer);
-          reject(error);
-        });
-    });
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  async shutdown(): Promise<void> {
+    // 清理连接
+    this.servers.clear();
+    console.log('🔌 MCP适配器关闭');
   }
 }

@@ -1,352 +1,309 @@
 /**
  * 三元索引记忆系统 (Memory System)
- * 基于 卦象索引(0~19682) + π展开深度(1~10) + e呼吸相位(0~1)
- *
- * 核心能力：
- * - 自动索引：内容 → 卦象/π/e
- * - 智能检索：基于语义相似度 + 时间衰减
- * - 记忆进化：访问频率 + 反馈闭环
- * - 跨窗口持久化
+ * 基于 卦象索引(0~19682) + π展开深度(1~10) + e呼吸相位(权重)
+ * 实现长期记忆的存储、检索、遗忘与进化
  */
 
-import { Memory, MemoryType, MemoryQuery, MemoryStats, MEMORY_TYPES } from './memory-types';
 import { MemoryStore } from './memory-store';
 import { v4 as uuidv4 } from 'uuid';
 
+export interface Memory {
+  id: string;
+  type: 'user' | 'feedback' | 'topic' | 'reference';
+  name: string;
+  content: string;
+  tags: string[];
+  hexagramIndex: number;
+  piDepth: number;
+  eWeight: number;
+  timestamp: number;
+  accessCount: number;
+  lastAccess: number;
+  importance: number; // 0~1
+}
+
+export interface MemoryQuery {
+  query: string;
+  type?: 'user' | 'feedback' | 'topic' | 'reference';
+  tags?: string[];
+  limit?: number;
+  minImportance?: number;
+}
+
 export class MemorySystem {
   private store: MemoryStore;
-  private cache: Memory[] = [];
+  private memories: Memory[] = [];
   private initialized = false;
-  private readonly HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000; // 7天
-  private readonly PI_DIGITS = '31415926535897932384626433832795028841971693993751';
+  private readonly HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000;
+  private readonly MAX_MEMORIES = 10000;
 
-  constructor(options?: { filePath?: string }) {
-    this.store = new MemoryStore(options);
+  constructor() {
+    this.store = new MemoryStore();
   }
 
-  async initialize(): Promise<void> {
+  async initialize() {
     if (this.initialized) return;
     await this.store.initialize();
-    this.cache = await this.store.loadAll();
+    this.memories = await this.store.loadAll();
     this.initialized = true;
-    console.log(`🧠 记忆系统初始化: ${this.cache.length} 条记忆`);
+    console.log(`🧠 记忆系统初始化: ${this.memories.length} 条记忆`);
   }
 
   /**
    * 保存记忆
    */
-  async save(
-    memory: Omit<Memory, 'id' | 'hexagramIndex' | 'piDepth' | 'eWeight' | 'timestamp' | 'accessCount' | 'lastAccess'>
-  ): Promise<Memory> {
+  async save(memory: Omit<Memory, 'id' | 'hexagramIndex' | 'piDepth' | 'eWeight' | 'timestamp' | 'accessCount' | 'lastAccess' | 'importance'>): Promise<Memory> {
     await this.ensureInitialized();
 
-    const content = memory.content;
     const fullMemory: Memory = {
       id: uuidv4(),
       ...memory,
-      hexagramIndex: this.calcHexagramIndex(content),
-      piDepth: this.calcPiDepth(content),
-      eWeight: this.calcEWeight(content),
+      hexagramIndex: this.calcHexagramIndex(memory.content),
+      piDepth: this.calcPiDepth(memory.content),
+      eWeight: this.calcEWeight(memory.content),
       timestamp: Date.now(),
       accessCount: 0,
-      lastAccess: Date.now()
+      lastAccess: Date.now(),
+      importance: this.calcImportance(memory.content)
     };
 
-    this.cache.push(fullMemory);
+    // 去重：检查是否有相似记忆
+    const similar = this.findSimilar(fullMemory);
+    if (similar) {
+      // 更新已有记忆而不是新增
+      return await this.update(similar.id, {
+        content: fullMemory.content,
+        importance: Math.min(1, similar.importance + 0.1),
+        eWeight: Math.min(1, similar.eWeight + 0.05)
+      });
+    }
+
+    this.memories.push(fullMemory);
     await this.store.save(fullMemory);
+    this.prune();
     return fullMemory;
-  }
-
-  /**
-   * 批量保存
-   */
-  async saveAll(memories: Array<Omit<Memory, 'id' | 'hexagramIndex' | 'piDepth' | 'eWeight' | 'timestamp' | 'accessCount' | 'lastAccess'>>): Promise<Memory[]> {
-    await this.ensureInitialized();
-    const fullMemories: Memory[] = memories.map(m => ({
-      id: uuidv4(),
-      ...m,
-      hexagramIndex: this.calcHexagramIndex(m.content),
-      piDepth: this.calcPiDepth(m.content),
-      eWeight: this.calcEWeight(m.content),
-      timestamp: Date.now(),
-      accessCount: 0,
-      lastAccess: Date.now()
-    }));
-    this.cache.push(...fullMemories);
-    await this.store.saveAll(fullMemories);
-    return fullMemories;
-  }
-
-  /**
-   * 检索记忆（基于查询）
-   */
-  async retrieve(query: string | MemoryQuery, limit: number = 10): Promise<Memory[]> {
-    await this.ensureInitialized();
-
-    let q: MemoryQuery;
-    if (typeof query === 'string') {
-      q = { query, limit };
-    } else {
-      q = { ...query, limit: query.limit || limit };
-    }
-
-    let results = [...this.cache];
-
-    // 类型过滤
-    if (q.type) {
-      results = results.filter(m => m.type === q.type);
-    }
-
-    // 标签过滤
-    if (q.tags && q.tags.length > 0) {
-      results = results.filter(m => q.tags!.some(tag => m.tags.includes(tag)));
-    }
-
-    // e权重过滤
-    if (q.minEWeight !== undefined) {
-      results = results.filter(m => m.eWeight >= q.minEWeight!);
-    }
-    if (q.maxEWeight !== undefined) {
-      results = results.filter(m => m.eWeight <= q.maxEWeight!);
-    }
-
-    // 如果有关键词查询，计算相似度排序
-    if (q.query) {
-      const queryHex = this.calcHexagramIndex(q.query);
-      const queryPi = this.calcPiDepth(q.query);
-
-      results = results.map(m => {
-        const hexScore = 1 - Math.abs(m.hexagramIndex - queryHex) / 19683;
-        const piScore = 1 - Math.abs(m.piDepth - queryPi) / 10;
-        const eScore = m.eWeight * this.calcDecay(m.timestamp);
-        const accessBoost = Math.min(1, m.accessCount / 10) * 0.1;
-        const totalScore = hexScore * 0.4 + piScore * 0.2 + eScore * 0.3 + accessBoost;
-        return { memory: m, score: totalScore };
-      });
-
-      results.sort((a, b) => b.score - a.score);
-      results = results.slice(0, q.limit || 10).map(item => item.memory);
-    } else {
-      // 排序
-      const sortBy = q.sortBy || 'timestamp';
-      const sortOrder = q.sortOrder || 'desc';
-      results.sort((a, b) => {
-        const aVal = a[sortBy as keyof Memory] as number;
-        const bVal = b[sortBy as keyof Memory] as number;
-        return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
-      });
-      results = results.slice(q.offset || 0, (q.offset || 0) + (q.limit || 10));
-    }
-
-    // 更新访问计数
-    for (const m of results) {
-      m.accessCount++;
-      m.lastAccess = Date.now();
-    }
-    await this.flush();
-
-    return results;
-  }
-
-  /**
-   * 按ID获取记忆
-   */
-  async get(id: string): Promise<Memory | undefined> {
-    await this.ensureInitialized();
-    const memory = this.cache.find(m => m.id === id);
-    if (memory) {
-      memory.accessCount++;
-      memory.lastAccess = Date.now();
-      await this.flush();
-    }
-    return memory;
   }
 
   /**
    * 更新记忆
    */
-  async update(id: string, updates: Partial<Omit<Memory, 'id' | 'hexagramIndex' | 'piDepth' | 'eWeight' | 'timestamp'>>): Promise<Memory | undefined> {
+  async update(id: string, updates: Partial<Omit<Memory, 'id' | 'timestamp' | 'accessCount'>>): Promise<Memory> {
     await this.ensureInitialized();
-    const idx = this.cache.findIndex(m => m.id === id);
-    if (idx === -1) return undefined;
+    const index = this.memories.findIndex(m => m.id === id);
+    if (index === -1) throw new Error(`Memory ${id} not found`);
 
-    const memory = this.cache[idx];
-    const newContent = updates.content || memory.content;
-
-    // 如果内容变化，重新计算索引
-    const updated: Memory = {
-      ...memory,
-      ...updates,
-      content: newContent,
-      hexagramIndex: updates.content ? this.calcHexagramIndex(newContent) : memory.hexagramIndex,
-      piDepth: updates.content ? this.calcPiDepth(newContent) : memory.piDepth,
-      eWeight: updates.content ? this.calcEWeight(newContent) : memory.eWeight,
-      timestamp: Date.now()
-    };
-
-    this.cache[idx] = updated;
+    const updated = { ...this.memories[index], ...updates, timestamp: Date.now() };
+    this.memories[index] = updated;
     await this.store.save(updated);
     return updated;
   }
 
   /**
+   * 检索记忆
+   */
+  retrieve(query: string, limit: number = 10, type?: Memory['type']): Memory[] {
+    // 先使用简单关键词匹配，后续可升级为embedding
+    const queryLower = query.toLowerCase();
+    const keywords = queryLower.split(/\s+/).filter(w => w.length > 2);
+
+    let scored = this.memories.map(m => {
+      let score = 0;
+      const contentLower = m.content.toLowerCase();
+      const nameLower = m.name.toLowerCase();
+      const tagMatch = m.tags.some(t => keywords.some(k => t.toLowerCase().includes(k)));
+
+      for (const keyword of keywords) {
+        if (contentLower.includes(keyword)) score += 3;
+        if (nameLower.includes(keyword)) score += 2;
+        if (tagMatch) score += 1;
+      }
+
+      // 卦象相似度
+      const queryHex = this.calcHexagramIndex(query);
+      const hexScore = 1 - Math.abs(m.hexagramIndex - queryHex) / 19682;
+      score += hexScore * 0.5;
+
+      // e活性权重
+      const eScore = m.eWeight * this.calcDecay(m.timestamp);
+      score += eScore * 0.3;
+
+      // 访问频率
+      const accessBoost = Math.min(1, m.accessCount / 10) * 0.2;
+      score += accessBoost;
+
+      // 重要性
+      score += m.importance * 0.3;
+
+      return { memory: m, score };
+    });
+
+    // 类型过滤
+    if (type) {
+      scored = scored.filter(s => s.memory.type === type);
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored.slice(0, limit).map(s => s.memory);
+
+    // 更新访问计数
+    for (const m of top) {
+      m.accessCount++;
+      m.lastAccess = Date.now();
+      this.store.save(m);
+    }
+
+    return top;
+  }
+
+  /**
+   * 按条件查询
+   */
+  query(options: MemoryQuery): Memory[] {
+    let results = [...this.memories];
+
+    if (options.type) {
+      results = results.filter(m => m.type === options.type);
+    }
+    if (options.tags && options.tags.length > 0) {
+      results = results.filter(m => options.tags!.some(t => m.tags.includes(t)));
+    }
+    if (options.minImportance !== undefined) {
+      results = results.filter(m => m.importance >= options.minImportance!);
+    }
+
+    // 按重要性排序
+    results.sort((a, b) => b.importance - a.importance);
+
+    return results.slice(0, options.limit || 20);
+  }
+
+  /**
    * 删除记忆
    */
-  async delete(id: string): Promise<boolean> {
+  async delete(id: string): Promise<void> {
     await this.ensureInitialized();
-    const idx = this.cache.findIndex(m => m.id === id);
-    if (idx === -1) return false;
-    this.cache.splice(idx, 1);
+    this.memories = this.memories.filter(m => m.id !== id);
     await this.store.delete(id);
-    return true;
   }
 
   /**
-   * 清空所有记忆
+   * 获取所有记忆
    */
-  async clear(): Promise<void> {
-    await this.ensureInitialized();
-    this.cache = [];
-    await this.store.clear();
+  getAll(): Memory[] {
+    return [...this.memories];
   }
 
   /**
-   * 获取统计信息
+   * 统计信息
    */
-  async getStats(): Promise<MemoryStats> {
-    await this.ensureInitialized();
-    const memories = this.cache;
-    const byType: Record<MemoryType, number> = {
-      user: 0,
-      feedback: 0,
-      topic: 0,
-      reference: 0
-    };
+  getStats(): {
+    total: number;
+    byType: Record<string, number>;
+    avgImportance: number;
+    totalAccesses: number;
+  } {
+    const byType: Record<string, number> = {};
+    let totalImportance = 0;
+    let totalAccesses = 0;
 
-    const tagCount: Record<string, number> = {};
-    let totalPi = 0;
-    let totalE = 0;
-    let oldest = Date.now();
-    let newest = 0;
-
-    for (const m of memories) {
+    for (const m of this.memories) {
       byType[m.type] = (byType[m.type] || 0) + 1;
-      totalPi += m.piDepth;
-      totalE += m.eWeight;
-      if (m.timestamp < oldest) oldest = m.timestamp;
-      if (m.timestamp > newest) newest = m.timestamp;
-      for (const tag of m.tags) {
-        tagCount[tag] = (tagCount[tag] || 0) + 1;
-      }
+      totalImportance += m.importance;
+      totalAccesses += m.accessCount;
     }
-
-    const mostActiveTags = Object.entries(tagCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([tag, count]) => ({ tag, count }));
 
     return {
-      total: memories.length,
+      total: this.memories.length,
       byType,
-      avgPiDepth: memories.length > 0 ? totalPi / memories.length : 0,
-      avgEWeight: memories.length > 0 ? totalE / memories.length : 0,
-      mostActiveTags,
-      oldestTimestamp: oldest,
-      newestTimestamp: newest
+      avgImportance: this.memories.length > 0 ? totalImportance / this.memories.length : 0,
+      totalAccesses
     };
   }
 
   /**
-   * 异步刷新到存储
+   * 查找相似记忆（去重）
    */
-  async flush(): Promise<void> {
-    await this.store.saveAll(this.cache);
-  }
-
-  /**
-   * 关闭记忆系统
-   */
-  async shutdown(): Promise<void> {
-    await this.flush();
-    console.log('💾 记忆系统已关闭');
-  }
-
-  /**
-   * 获取所有记忆（用于调试）
-   */
-  getAllMemories(): Memory[] {
-    return [...this.cache];
-  }
-
-  // ===== 私有方法 =====
-
-  private async ensureInitialized(): Promise<void> {
-    if (!this.initialized) {
-      await this.initialize();
+  private findSimilar(memory: Memory): Memory | null {
+    const threshold = 0.8;
+    for (const existing of this.memories) {
+      if (existing.type !== memory.type) continue;
+      const dist = this.calcDistance(memory.content, existing.content);
+      if (dist < 1 - threshold) {
+        return existing;
+      }
     }
+    return null;
   }
 
-  /**
-   * 计算卦象索引 (0~19682)
-   */
+  private calcDistance(a: string, b: string): number {
+    const wordsA = new Set(a.toLowerCase().split(/\s+/));
+    const wordsB = new Set(b.toLowerCase().split(/\s+/));
+    const intersection = new Set([...wordsA].filter(w => wordsB.has(w)));
+    const union = new Set([...wordsA, ...wordsB]);
+    return 1 - intersection.size / union.size;
+  }
+
   private calcHexagramIndex(content: string): number {
     let hash = 0;
     for (let i = 0; i < content.length; i++) {
-      hash = ((hash << 5) - hash + content.charCodeAt(i)) & 0x7FFFFFFF;
+      hash = (hash << 5) - hash + content.charCodeAt(i);
+      hash |= 0;
     }
     return Math.abs(hash) % 19683;
   }
 
-  /**
-   * 计算π展开深度 (1~10)
-   */
   private calcPiDepth(content: string): number {
     const length = Math.min(content.length, 1000);
-    if (length === 0) return 5;
-    const uniqueChars = new Set(content).size;
-    const complexity = uniqueChars / Math.max(length, 1);
-    return Math.max(1, Math.min(10, Math.floor(complexity * 12) + 1));
+    const uniqueRatio = new Set(content).size / Math.max(length, 1);
+    const complexity = Math.min(1, (length / 200) * 0.5 + uniqueRatio * 0.5);
+    return Math.max(1, Math.min(10, Math.floor(complexity * 10) + 1));
   }
 
-  /**
-   * 计算e呼吸相位权重 (0~1)
-   */
   private calcEWeight(content: string): number {
-    // 基于内容重要性和新鲜度
-    let weight = 0.5;
-    const lower = content.toLowerCase();
-    if (/重要|关键|核心|必须|紧急/.test(lower)) weight += 0.2;
-    if (/未来|计划|目标|方向/.test(lower)) weight += 0.15;
-    if (/经验|教训|总结/.test(lower)) weight += 0.1;
-    if (/风险|威胁|危机/.test(lower)) weight += 0.1;
-    if (content.length > 100) weight += 0.05;
+    const hasUrgency = /现在|立即|紧急|重要/.test(content);
+    const hasEmotion = /爱|恨|喜|怒|哀|乐|感/.test(content);
+    let weight = 0.4;
+    if (hasUrgency) weight += 0.3;
+    if (hasEmotion) weight += 0.2;
+    if (content.length > 100) weight += 0.1;
     return Math.min(1, weight);
   }
 
-  /**
-   * 计算衰减因子
-   */
+  private calcImportance(content: string): number {
+    let score = 0.3;
+    const keywords = ['重要', '关键', '核心', '必须', '一定', '确保', '否则'];
+    for (const kw of keywords) {
+      if (content.includes(kw)) score += 0.1;
+    }
+    if (content.length > 200) score += 0.1;
+    return Math.min(1, score);
+  }
+
   private calcDecay(timestamp: number): number {
     const age = Date.now() - timestamp;
     const halfLives = age / this.HALF_LIFE_MS;
     return Math.exp(-halfLives);
   }
 
-  /**
-   * 自动清理：删除衰减过度的记忆（可配置）
-   */
-  async autoCleanup(threshold: number = 0.01): Promise<number> {
-    await this.ensureInitialized();
-    const toDelete: string[] = [];
-    for (const m of this.cache) {
-      const decay = this.calcDecay(m.timestamp);
-      if (decay < threshold && m.accessCount < 2) {
-        toDelete.push(m.id);
-      }
+  private prune(): void {
+    if (this.memories.length <= this.MAX_MEMORIES) return;
+    // 按重要性排序，保留最重要的
+    const sorted = [...this.memories].sort((a, b) => {
+      const scoreA = a.importance * a.eWeight * (1 + Math.log1p(a.accessCount));
+      const scoreB = b.importance * b.eWeight * (1 + Math.log1p(b.accessCount));
+      return scoreB - scoreA;
+    });
+    this.memories = sorted.slice(0, this.MAX_MEMORIES);
+  }
+
+  private async ensureInitialized() {
+    if (!this.initialized) {
+      await this.initialize();
     }
-    for (const id of toDelete) {
-      await this.delete(id);
-    }
-    return toDelete.length;
+  }
+
+  async shutdown(): Promise<void> {
+    await this.store.saveAll(this.memories);
+    console.log('💾 记忆系统已关闭');
   }
 }

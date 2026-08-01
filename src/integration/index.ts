@@ -1,43 +1,22 @@
 /**
  * 四元一体集成入口
  * 意识形态层 + 认知空间层 + 研究引擎层 + 生命体实例层
- *
- * 统一生命周期管理：启动 → 运行 → 关闭
  */
 
 import { IdeologyLayer } from '../core/ideology';
 import { EngineLayer } from '../core/engine';
 import { InstanceLayer } from '../core/instance';
+import { CognitiveSpace } from '../cognitive/cognitive-space';
 import { MemorySystem } from '../memory/memory-system';
 import { SkillLoader } from '../skills/skill-loader';
 import { MCPAdapter } from '../tools/mcp-adapter';
 import { CronScheduler } from '../scheduler/cron-scheduler';
-import { DeepSeekCognize } from '../cognitive/deepseek-cognize';
-import { CognitiveSnapshot } from '../cognitive/cognitive-space';
-import { TaskResult } from '../cognitive/deepseek-cognize';
-
-export interface AGIHealthStatus {
-  healthy: boolean;
-  layers: {
-    ideology: boolean;
-    cognitive: boolean;
-    memory: boolean;
-    engine: boolean;
-    instance: boolean;
-    skills: boolean;
-    tools: boolean;
-    scheduler: boolean;
-  };
-  memoryCount: number;
-  planCount: number;
-  cognitiveSummary: string;
-  uptime: number;
-}
+import { HealthStatus } from '../types';
 
 export class TCAGI4 {
   // 四层
   private ideology: IdeologyLayer;
-  private cognitive: DeepSeekCognize;
+  private cognitive: CognitiveSpace;
   private engine: EngineLayer;
   private instance: InstanceLayer;
 
@@ -47,32 +26,28 @@ export class TCAGI4 {
   private mcp: MCPAdapter;
   private scheduler: CronScheduler;
 
-  // 状态
   private started = false;
-  private startTime = 0;
-  private healthCheckInterval: NodeJS.Timeout | null = null;
+  private startTime: Date | null = null;
 
-  constructor(options?: { memoryFilePath?: string }) {
+  constructor() {
     // 初始化各层
     this.ideology = new IdeologyLayer();
-    this.memory = new MemorySystem(options);
+    this.cognitive = new CognitiveSpace();
+    this.memory = new MemorySystem();
     this.skillLoader = new SkillLoader(this.memory);
     this.mcp = new MCPAdapter();
     this.scheduler = new CronScheduler();
-    this.cognitive = new DeepSeekCognize();
     this.engine = new EngineLayer(
       this.ideology,
+      this.cognitive,
       this.memory,
       this.skillLoader,
       this.mcp,
       this.scheduler
     );
-    this.instance = new InstanceLayer(this.engine, this.memory);
+    this.instance = new InstanceLayer(this.engine, this.memory, this.cognitive);
   }
 
-  /**
-   * 启动系统
-   */
   async start(): Promise<void> {
     if (this.started) {
       console.log('⚠️ 系统已在运行中');
@@ -80,48 +55,40 @@ export class TCAGI4 {
     }
 
     console.log('🌀 TC-AGI-Research (四元一体) 启动...');
-    this.startTime = Date.now();
+    this.startTime = new Date();
 
     try {
       // 1. 意识形态层
       await this.ideology.initialize();
-      console.log('  ✅ 意识形态层就绪');
 
-      // 2. 记忆系统
+      // 2. 认知空间层（自动初始化）
+      this.cognitive.perceive('系统启动 — 认知初始化');
+
+      // 3. 记忆系统
       await this.memory.initialize();
-      console.log(`  ✅ 记忆系统就绪 (${this.memory.getAllMemories().length} 条记忆)`);
 
-      // 3. 技能系统
+      // 4. 技能系统
       await this.skillLoader.loadAll();
-      console.log(`  ✅ 技能系统就绪 (${this.skillLoader.getAvailableSkills().length} 个技能)`);
 
-      // 4. MCP 工具
+      // 5. MCP 工具
       await this.mcp.initialize();
-      console.log(`  ✅ MCP 工具就绪 (${this.mcp.getAvailableTools().length} 个工具)`);
 
-      // 5. 调度器
+      // 6. 调度器
       await this.scheduler.initialize();
-      console.log(`  ✅ 调度器就绪 (${this.scheduler.getTaskCount()} 个任务)`);
 
-      // 6. 认知空间（自动初始化）
-      this.cognitive.perceive('系统启动 — 四元一体就绪');
-      console.log(`  ✅ 认知空间就绪: ${this.cognitive.getSummary()}`);
-
-      // 7. 引擎层
+      // 7. 研究引擎
       await this.engine.initialize();
-      console.log('  ✅ 研究引擎层就绪');
 
-      // 8. 实例层
+      // 8. 生命体实例
       await this.instance.initialize();
-      console.log('  ✅ 生命体实例层就绪');
 
       this.started = true;
-
-      // 启动健康检查
-      this.startHealthCheck();
-
+      const snapshot = this.cognitive.getSnapshot();
       console.log('✅ TC-AGI-Research (四元一体) 已就绪');
-      console.log(`📊 认知态势: ${this.cognitive.getSummary()}`);
+      console.log(`🧠 认知态势: ${snapshot.state.summary}`);
+      console.log(`📊 记忆数量: ${this.memory.getAll().length}`);
+      console.log(`🔧 技能数量: ${this.skillLoader.getAvailableSkills().length}`);
+      console.log(`🔌 工具数量: ${this.mcp.getAvailableTools().length}`);
     } catch (error) {
       console.error('❌ 启动失败:', error);
       throw error;
@@ -129,118 +96,80 @@ export class TCAGI4 {
   }
 
   /**
-   * 提交任务（自动经过完整认知循环）
+   * 提交任务
    */
   async submitTask(task: string, context?: any): Promise<any> {
-    this.ensureStarted();
-
-    console.log(`📌 接收任务: ${task}`);
-
-    // 1. 认知觉知
-    const state = this.cognitive.perceive(task);
-    console.log(`   🧠 认知定位: 卦象 ${state.hexagramIndex} | ${state.summary}`);
-
-    // 2. 推理策略
-    const strategy = this.cognitive.reason(state);
-    console.log(`   🎯 策略派生: ${strategy.name} (置信度: ${(strategy.confidence * 100).toFixed(0)}%)`);
-
-    // 3. 检索相关记忆
-    const memories = await this.memory.retrieve(task, 5);
-    if (memories.length > 0) {
-      console.log(`   📚 相关记忆: ${memories.length} 条`);
+    if (!this.started) {
+      await this.start();
     }
 
-    // 4. 分解任务
-    const plan = await this.engine.decomposeTask(task, { ...context, strategy, cognitiveState: state });
-    console.log(`   📋 计划已创建: ${plan.id} (${plan.steps.length} 步)`);
+    // 1. 先进行认知觉知
+    const state = this.cognitive.perceive(task);
+    console.log(`📌 认知定位: 卦象 ${state.hexagramIndex} | ${state.summary}`);
 
-    // 5. 执行计划
-    const results = await this.engine.executePlan(plan.id);
+    // 2. 执行任务
+    const result = await this.instance.executeTask(task, context);
 
-    // 6. 进化（自动在引擎中完成）
-    const snapshot = this.engine.getCognitiveSnapshot();
-    console.log(`   🔄 认知已进化: ${snapshot.state.summary}`);
-
-    return {
-      planId: plan.id,
-      results,
-      cognitiveSummary: snapshot.state.summary,
-      strategy: strategy.name
-    };
+    return result;
   }
 
   /**
    * 获取完整认知态势
    */
-  getCognitiveSnapshot(): CognitiveSnapshot {
-    this.ensureStarted();
-    return this.engine.getCognitiveSnapshot();
-  }
-
-  /**
-   * 获取认知摘要
-   */
-  getCognitiveSummary(): string {
-    this.ensureStarted();
-    return this.engine.getCognitiveSummary();
-  }
-
-  /**
-   * 获取所有计划
-   */
-  getPlans() {
-    this.ensureStarted();
-    return this.engine.getPlans();
-  }
-
-  /**
-   * 获取计划详情
-   */
-  getPlan(planId: string) {
-    this.ensureStarted();
-    return this.engine.getPlan(planId);
-  }
-
-  /**
-   * 获取引擎状态
-   */
-  getEngineStatus() {
-    this.ensureStarted();
-    return this.engine.getStatus();
+  getCognitiveSnapshot() {
+    return this.cognitive.getSnapshot();
   }
 
   /**
    * 获取记忆统计
    */
-  async getMemoryStats() {
-    this.ensureStarted();
+  getMemoryStats() {
     return this.memory.getStats();
+  }
+
+  /**
+   * 获取系统统计
+   */
+  getStats() {
+    const instanceStats = this.instance.getStats();
+    const schedulerStats = this.scheduler.getStats();
+    const memoryStats = this.memory.getStats();
+    const skills = this.skillLoader.getAvailableSkills();
+    const tools = this.mcp.getAvailableTools();
+
+    return {
+      uptime: this.startTime ? Date.now() - this.startTime.getTime() : 0,
+      memory: memoryStats,
+      instance: instanceStats,
+      scheduler: schedulerStats,
+      skills: skills.length,
+      tools: tools.length,
+      cognitive: this.cognitive.getSnapshot().state.summary
+    };
   }
 
   /**
    * 健康检查
    */
-  async healthCheck(): Promise<AGIHealthStatus> {
-    this.ensureStarted();
-    const memoryStats = await this.memory.getStats();
-    const engineStatus = this.engine.getStatus();
+  async healthCheck(): Promise<HealthStatus> {
+    const components = {
+      ideology: true,
+      cognitive: true,
+      memory: this.memory.getAll().length >= 0,
+      engine: true,
+      instance: true,
+      skills: this.skillLoader.getAvailableSkills().length > 0,
+      tools: this.mcp.getAvailableTools().length > 0,
+      scheduler: true
+    };
+
+    const allHealthy = Object.values(components).every(v => v === true);
 
     return {
-      healthy: true,
-      layers: {
-        ideology: true,
-        cognitive: true,
-        memory: true,
-        engine: true,
-        instance: true,
-        skills: true,
-        tools: true,
-        scheduler: true
-      },
-      memoryCount: memoryStats.total,
-      planCount: engineStatus.totalPlans,
-      cognitiveSummary: engineStatus.cognitiveSummary,
-      uptime: Date.now() - this.startTime
+      healthy: allHealthy,
+      components,
+      message: allHealthy ? '所有组件运行正常' : '部分组件异常',
+      uptime: this.startTime ? Date.now() - this.startTime.getTime() : 0
     };
   }
 
@@ -248,101 +177,44 @@ export class TCAGI4 {
    * 关闭系统
    */
   async shutdown(): Promise<void> {
-    if (!this.started) return;
+    console.log('🛑 正在关闭 TC-AGI-Research...');
 
-    console.log('🛑 关闭 TC-AGI-Research...');
-
-    // 停止健康检查
-    if (this.healthCheckInterval) {
-      clearInterval(this.healthCheckInterval);
-      this.healthCheckInterval = null;
-    }
-
-    // 关闭各层
     await this.scheduler.shutdown();
     await this.mcp.shutdown();
     await this.memory.shutdown();
 
     this.started = false;
+    this.startTime = null;
     console.log('✅ TC-AGI-Research 已关闭');
   }
 
   /**
-   * 获取认知空间实例（高级用法）
+   * 获取各组件引用（用于调试）
    */
-  getCognize(): DeepSeekCognize {
-    this.ensureStarted();
-    return this.engine.getCognize();
-  }
-
-  /**
-   * 获取记忆系统实例（高级用法）
-   */
-  getMemory(): MemorySystem {
-    this.ensureStarted();
-    return this.memory;
-  }
-
-  /**
-   * 获取引擎事件流
-   */
-  getEvents() {
-    this.ensureStarted();
-    return this.engine.getEvents();
-  }
-
-  /**
-   * 获取运行状态
-   */
-  isRunning(): boolean {
-    return this.started;
-  }
-
-  /**
-   * 获取运行时间
-   */
-  getUptime(): number {
-    return this.started ? Date.now() - this.startTime : 0;
-  }
-
-  // ===== 私有方法 =====
-
-  private ensureStarted(): void {
-    if (!this.started) {
-      throw new Error('系统未启动，请先调用 start() 方法');
-    }
-  }
-
-  private startHealthCheck(): void {
-    if (this.healthCheckInterval) return;
-
-    this.healthCheckInterval = setInterval(async () => {
-      try {
-        const status = await this.healthCheck();
-        if (!status.healthy) {
-          console.warn('⚠️ 健康检查警告: 部分层不健康');
-        }
-      } catch (error) {
-        console.error('❌ 健康检查失败:', error);
-      }
-    }, 60000); // 每分钟检查一次
+  getComponents() {
+    return {
+      ideology: this.ideology,
+      cognitive: this.cognitive,
+      memory: this.memory,
+      skillLoader: this.skillLoader,
+      mcp: this.mcp,
+      scheduler: this.scheduler,
+      engine: this.engine,
+      instance: this.instance
+    };
   }
 }
 
-// 单例导出（延迟初始化）
-let _instance: TCAGI4 | null = null;
+// 单例导出
+export const agi4 = new TCAGI4();
 
-export function getAGI(): TCAGI4 {
-  if (!_instance) {
-    _instance = new TCAGI4();
-  }
-  return _instance;
+// 便捷启动函数
+export async function startAGI() {
+  await agi4.start();
+  return agi4;
 }
 
-export async function startAGI(options?: { memoryFilePath?: string }): Promise<TCAGI4> {
-  const agi = new TCAGI4(options);
-  await agi.start();
-  return agi;
+// 便捷任务提交函数
+export async function runTask(task: string, context?: any) {
+  return agi4.submitTask(task, context);
 }
-
-export default TCAGI4;
