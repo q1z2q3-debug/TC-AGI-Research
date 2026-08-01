@@ -36,7 +36,7 @@ The system follows a **quad-layer** design:
 **Ternary Logic Substrate.** Each dimension takes values from {-1, 0, +1}:
 - **+1 (Yang)**: Expansion, active, positive
 - **-1 (Yin)**: Contraction, passive, negative
-- **0 (He)**: Balance, observation, emergent middle state
+- **0 (He/He)**: Balance, observation, emergent middle state
 
 **Nine Dimensions (3×3×3):**
 
@@ -248,5 +248,5 @@ MIT
 ---
 
 **Related projects:**
-- [Cognitive Life Body](https://github.com/q1z2q3-debug/TC-AGI-Research) — Theoretical foundation
+- [Cognitive Life Body Paper](https://github.com/q1z2q3-debug/TC-AGI-Research) — Theoretical foundation
 - WQB Alpha Factory — Empirical validation with 27 ACTIVE factors

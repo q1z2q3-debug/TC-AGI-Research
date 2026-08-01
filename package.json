@@ -12,7 +12,30 @@
     "start:loop": "ts-node src/daemon.ts",
     "lint": "eslint src/**/*.ts"
   },
-  "keywords": ["agi", "agent", "memory", "self-evolve", "ideology", "cognitive-space"],
+  "keywords": [
+    "agi",
+    "cognitive-architecture",
+    "ternary-logic",
+    "active-inference",
+    "free-energy-principle",
+    "autonomous-agents",
+    "cognitive-science",
+    "prototype-discovery",
+    "typescript",
+    "agent",
+    "memory",
+    "self-evolve",
+    "ideology",
+    "cognitive-space"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/q1z2q3-debug/TC-AGI-Research.git"
+  },
+  "homepage": "https://github.com/q1z2q3-debug/TC-AGI-Research#readme",
+  "bugs": {
+    "url": "https://github.com/q1z2q3-debug/TC-AGI-Research/issues"
+  },
   "author": "q1z2q3-debug",
   "license": "MIT",
   "dependencies": {
