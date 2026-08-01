@@ -11,7 +11,7 @@
 
 **TC-AGI-Research** implements a **Cognitive Life Body** architecture grounded in **ternary logic** (-1/0/+1), creating a 3⁹ = 19,683-state cognitive space. It integrates **active inference** with precision-weighted free energy, **prototype discovery**, and a **null-engine skill creation loop** for autonomous capability emergence.
 
-The system is validated by **27 ACTIVE quantitative factors** (Sharpe 1.27–2.76) on live US equity markets, demonstrating that cognitive patterns derived from this architecture produce measurable real-world decision-making performance.
+> **Empirical Note:** The system has been validated by **27 ACTIVE quantitative factors** (Sharpe 1.27–2.76) on live US equity markets. The factor details are **proprietary and confidential** — referenced here for credibility only. See the [Empirical Validation](#empirical-validation) section for the public summary.
 
 ---
 
@@ -187,6 +187,8 @@ await agi.shutdown();
 
 ## Empirical Validation
 
+> **Confidentiality Notice:** The factor construction details, source code, and full dataset are **proprietary and confidential**. The following is a public summary for reference only. Do not request access to the underlying factor data.
+
 The cognitive patterns derived from this architecture have been validated through **27 ACTIVE quantitative factors** on a professional factor platform (US equity market, 2000+ stocks):
 
 - **Sharpe ratio range**: 1.27–2.76
@@ -249,4 +251,4 @@ MIT
 
 **Related projects:**
 - [Cognitive Life Body](https://github.com/q1z2q3-debug/TC-AGI-Research) — Theoretical foundation
-- WQB Alpha Factory — Empirical validation with 27 ACTIVE factors
+- WQB Alpha Factory — Empirical validation with 27 ACTIVE factors (proprietary, referenced for credibility only)
