@@ -30,9 +30,9 @@ services:
       - EMBEDDING_BASE_URL=http://ollama:11434
       - EMBEDDING_MODEL=nomic-embed-text
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - MEMORY_PATH=/app/data/memory.json
     volumes:
       - tc_agi_data:/app/data
-      - tc_agi_memory:/root/.tc-agi-memory.json
     restart: unless-stopped
     command: >
       sh -c "npm run build && node dist/daemon.js"
@@ -40,4 +40,3 @@ services:
 volumes:
   ollama_data:
   tc_agi_data:
-  tc_agi_memory:

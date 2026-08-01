@@ -64,8 +64,14 @@ export class MemoryStore {
     try {
       const fs = await import('fs');
       const path = await import('path');
-      const home = process.env.HOME || process.env.USERPROFILE || '.';
-      const memoryPath = path.join(home, '.tc-agi-memory.json');
+      // 优先使用环境变量 MEMORY_PATH，其次使用项目 data/ 目录
+      const memoryPath = process.env.MEMORY_PATH ||
+        path.join(process.cwd(), 'data', 'memory.json');
+      // 确保 data/ 目录存在
+      const dir = path.dirname(memoryPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
       if (fs.existsSync(memoryPath)) {
         const data = fs.readFileSync(memoryPath, 'utf-8');
         this.memory = JSON.parse(data);
@@ -103,8 +109,14 @@ export class MemoryStore {
     try {
       const fs = await import('fs');
       const path = await import('path');
-      const home = process.env.HOME || process.env.USERPROFILE || '.';
-      const memoryPath = path.join(home, '.tc-agi-memory.json');
+      // 优先使用环境变量 MEMORY_PATH，其次使用项目 data/ 目录
+      const memoryPath = process.env.MEMORY_PATH ||
+        path.join(process.cwd(), 'data', 'memory.json');
+      // 确保 data/ 目录存在
+      const dir = path.dirname(memoryPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
       fs.writeFileSync(memoryPath, JSON.stringify(this.memory, null, 2), 'utf-8');
     } catch (e) {
       // 忽略写入错误

@@ -8,3 +8,7 @@ coverage/
 .DS_Store
 *.tmp
 *.swp
+
+# 运行时数据目录
+data/*
+!data/.gitkeep
