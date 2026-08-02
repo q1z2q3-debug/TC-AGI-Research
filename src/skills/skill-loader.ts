@@ -162,24 +162,10 @@ export class SkillLoader {
       }
     });
 
-    // 量化因子技能
-    this.skills.set('alpha-factor', {
-      name: 'alpha-factor',
-      description: '开发和评估量化因子',
-      instructions: '使用 ACE Expression 或 Python 生成 Alpha',
-      memoryEnabled: true,
-      execute: async (params: any) => {
-        const expression = params.expression || 'rank(ts_delta(close,20))';
-        const assets = params.assets || ['AAPL', 'GOOG', 'MSFT'];
-        return {
-          alpha: expression,
-          assets,
-          sharpe: 1.8 + Math.random() * 0.5,
-          turnover: 0.3 + Math.random() * 0.2,
-          status: 'simulated'
-        };
-      }
-    });
+    // （已删除）alpha-factor 技能：曾为模拟实现的量化因子评估。
+    // 原实现使用 Math.random() 生成 Sharpe/turnover，不具备真实数据源。
+    // 无真实回测引擎支撑的"因子评估"能力，留着只会拖累项目可信度。
+    // 2026-08-02 应主人要求删除。
   }
 
   getSkill(name: string): Skill | undefined {
