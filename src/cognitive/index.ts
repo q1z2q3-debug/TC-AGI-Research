@@ -9,3 +9,7 @@ export * from './deepseek-cognize';
 export * from './semantic';
 export * from './llm';
 export * from './embedding';
+export * from './pi-e-resonance';
+export * from './five-aggregates';
+export * from './cognitive-resonance';
+export * from './empirical-validation';
