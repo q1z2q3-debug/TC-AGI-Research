@@ -58,6 +58,10 @@ The system follows a **quad-layer** design:
 | **梦境推理** | 无数据自主学习，反事实轨迹生成，边界发现 | `dream-reasoning.ts` |
 | **实现间隙** | 稀疏认知子流形 S*，H₄ 结构熵，禁带检测，约束传播 | `realization-gap.ts` |
 | **守恒律引擎** | 6 条预置守恒律 + 自动推导生成引擎，LawRegistry 单例 | `conservation-laws.ts` |
+| **四态构型动态相变** | 磐思/涟语/紊核/镜空四态认知构型，动态相变引擎 | `cognitive-phase.ts` |
+| **L7 裂变层** | 异常感知→悬置→自问→最小重构→完整性校验，自修改结构 | `fission-layer.ts` |
+| **三态输出引擎** | 学习态/对话态/化身态，自适应输出模式选择 | `tri-state-output.ts` |
+| **容器状态感知** | 感知用户意图层级（求答案/求映照/求示现/求陪伴等） | `container-sense.ts` |
 
 ### Active Inference Engine
 
@@ -183,12 +187,16 @@ await agi.shutdown();
 | `dream-reasoning.test.ts` | 19 | Dream state machine, counterfactual reward, trajectory |
 | `realization-gap.test.ts` | 29 | H₄ entropy, forbidden band, constraint propagation |
 | `conservation-laws.test.ts` | 42 | 6 conservation laws, LawRegistry, LawGenerator |
+| `cognitive-phase.test.ts` | 28 | 4 cognitive phases, dynamic transition, config switching |
+| `fission-layer.test.ts` | 22 | L7 fission, anomaly detection, suspend, refactor, integrity |
+| `tri-state-output.test.ts` | 22 | Learning/Dialogue/Avatar states, adaptive selection |
+| `container-sense.test.ts` | 23 | 6 container states, keyword sensing, structural features |
 | `evolve-attribution.test.ts` | 4 | LLM attribution, degradation, invalid JSON |
 | `semantic.test.ts` | 6 | Semantic mapping, deterministic coordinates |
 | `embedding.test.ts` | 9 | Cosine similarity, semantic retrieval, degradation |
 | `ideology.test.ts` | 3 | Compliance guard, values |
 | `integration.test.ts` | 22 | End-to-end full flow integration tests |
-| **Total** | **~256** | |
+| **Total** | **~351** | |
 
 ## Validation Methodology
 
@@ -235,6 +243,10 @@ TC-AGI-Research/
 │   │   ├── dream-reasoning.ts # Dream-state autonomous learning
 │   │   ├── realization-gap.ts # Sparse submanifold + H₄ structure entropy
 │   │   ├── conservation-laws.ts # 6 conservation laws + law generator
+│   │   ├── cognitive-phase.ts # 4 cognitive phases + dynamic transition engine
+│   │   ├── fission-layer.ts   # L7 fission: anomaly→suspend→self-inquiry→refactor
+│   │   ├── tri-state-output.ts # Tri-state output engine (learning/dialogue/avatar)
+│   │   ├── container-sense.ts  # Container state sensing (6 user intent states)
 │   │   ├── cognitive-space.ts  # Cognitive state management
 │   │   ├── deepseek-cognize.ts # Perceive→Reason→Evolve→Self-Aware cycle
 │   │   ├── semantic.ts     # Semantic mapping (Chinese/English bilingual)
@@ -263,7 +275,7 @@ TC-AGI-Research/
 
 ## Version
 
-v0.6.0-cognitive-完整 — 256+ tests, 18 cognitive modules, 3²⁰+ lines of cognitive architecture
+v0.7.0-hexq-fusion — 351+ tests, 22 cognitive modules, 4²⁰+ lines of cognitive architecture
 
 ## License
 
