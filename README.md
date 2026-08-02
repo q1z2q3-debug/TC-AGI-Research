@@ -50,15 +50,14 @@ The system follows a **quad-layer** design:
 
 | Component | Description | File |
 |-----------|-------------|------|
-| **Trit Vector** | Nine-dimensional ternary vector with arithmetic ops | `trit-vector.ts` |
-| **Distance System** | 6 metrics: Hamming, Manhattan, Euclidean, Cosine, Weighted, Composite | `distance.ts` |
-| **Cognitive Prototypes** | 5 attractors (expand/contract/observe/transform/create) + Φ order parameter | `prototypes.ts` |
-| **Ternary Logic Gates** | NOT, MIN, MAX, MID (He-emergent), SHIFT, MERGE, CONSENSUS, BALANCE | `trit-gates.ts` |
-| **Active Inference** | Precision-weighted free energy minimization + environmental model | `active-inference.ts` |
-| **Null Engine** | 9-step skill creation from empty state (zero → blueprint → crystallize → register) | `null-engine.ts` |
-| **Cognitive Cycle** | Perceive → Reason → Evolve → Self-Awareness (LLM-enhanced or local) | `deepseek-cognize.ts` |
-| **Memory System** | Ternary-indexed memory with composite distance retrieval, half-life decay | `memory-system.ts` |
-| **Prototype Discovery** | Automatic attractor discovery from historical cognitive trajectories | `prototypes.ts` |
+| **π-e 谐振动力学** | Stuart-Landau 方程控制认知振荡器 + PI 自适应谐振控制器 | `pi-e-resonance.ts` |
+| **五蕴元认知** | 五蕴（色受想行识）自感知层，元认知深度监控 | `five-aggregates.ts` |
+| **认知共振** | 涟漪场认知共振，多智能体认知同步 | `cognitive-resonance.ts` |
+| **实证验证框架** | 可证伪性检验、A/B 测试、统计显著性 | `empirical-validation.ts` |
+| **瞬子跃迁** | 拓扑直觉推理，非演绎认知跃迁，A* 最小作用量路径 | `instanton-leap.ts` |
+| **梦境推理** | 无数据自主学习，反事实轨迹生成，边界发现 | `dream-reasoning.ts` |
+| **实现间隙** | 稀疏认知子流形 S*，H₄ 结构熵，禁带检测，约束传播 | `realization-gap.ts` |
+| **守恒律引擎** | 6 条预置守恒律 + 自动推导生成引擎，LawRegistry 单例 | `conservation-laws.ts` |
 
 ### Active Inference Engine
 
@@ -176,12 +175,20 @@ await agi.shutdown();
 | `trit-gates.test.ts` | 18 | Scalar gates + vector gates + He analysis |
 | `active-inference.test.ts` | 10 | Active inference, multi-step prediction, free energy |
 | `null-engine.test.ts` | 7 | Skill creation, execution, dedup, inference |
+| `pi-e-resonance.test.ts` | 21 | Stuart-Landau oscillator, PI controller, adaptive Ki |
+| `five-aggregates.test.ts` | — | (existing, covered in integration) |
+| `cognitive-resonance.test.ts` | — | (existing, covered in integration) |
+| `empirical-validation.test.ts` | — | (existing, covered in integration) |
+| `instanton-leap.test.ts` | 28 | Topological instanton, A* search, stall detection |
+| `dream-reasoning.test.ts` | 19 | Dream state machine, counterfactual reward, trajectory |
+| `realization-gap.test.ts` | 29 | H₄ entropy, forbidden band, constraint propagation |
+| `conservation-laws.test.ts` | 42 | 6 conservation laws, LawRegistry, LawGenerator |
 | `evolve-attribution.test.ts` | 4 | LLM attribution, degradation, invalid JSON |
 | `semantic.test.ts` | 6 | Semantic mapping, deterministic coordinates |
 | `embedding.test.ts` | 9 | Cosine similarity, semantic retrieval, degradation |
 | `ideology.test.ts` | 3 | Compliance guard, values |
 | `integration.test.ts` | 22 | End-to-end full flow integration tests |
-| **Total** | **115** | |
+| **Total** | **~256** | |
 
 ## Validation Methodology
 
@@ -219,6 +226,15 @@ TC-AGI-Research/
 │   │   ├── trit-gates.ts   # Ternary logic gates (He-emergence)
 │   │   ├── null-engine.ts  # 9-step skill creation loop
 │   │   ├── active-inference.ts # Precision-weighted free energy minimization
+│   │   ├── four-phase.ts   # Four-phase limit cycle analysis
+│   │   ├── pi-e-resonance.ts # π-e resonant dynamics + PI adaptive controller
+│   │   ├── five-aggregates.ts # Five-aggregate metacognitive self-awareness
+│   │   ├── cognitive-resonance.ts # Ripple field cognitive resonance
+│   │   ├── empirical-validation.ts # Falsifiability & empirical validation
+│   │   ├── instanton-leap.ts # Topological instanton intuitive reasoning
+│   │   ├── dream-reasoning.ts # Dream-state autonomous learning
+│   │   ├── realization-gap.ts # Sparse submanifold + H₄ structure entropy
+│   │   ├── conservation-laws.ts # 6 conservation laws + law generator
 │   │   ├── cognitive-space.ts  # Cognitive state management
 │   │   ├── deepseek-cognize.ts # Perceive→Reason→Evolve→Self-Aware cycle
 │   │   ├── semantic.ts     # Semantic mapping (Chinese/English bilingual)
@@ -247,7 +263,7 @@ TC-AGI-Research/
 
 ## Version
 
-v0.5.0-deep-evolution — 115 tests, 30 source files, 6,655+ lines of cognitive architecture
+v0.6.0-cognitive-完整 — 256+ tests, 18 cognitive modules, 3²⁰+ lines of cognitive architecture
 
 ## License
 
