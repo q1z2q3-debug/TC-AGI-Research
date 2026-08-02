@@ -13,3 +13,6 @@ export * from './pi-e-resonance';
 export * from './five-aggregates';
 export * from './cognitive-resonance';
 export * from './empirical-validation';
+export * from './instanton-leap';
+export * from './dream-reasoning';
+export * from './realization-gap';
