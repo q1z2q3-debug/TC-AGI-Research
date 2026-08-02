@@ -24,6 +24,7 @@
 
 import { TritVector, TritVectorOps, ALL_DIMENSIONS } from './trit-vector';
 import { CognitiveDistance } from './distance';
+import { FourPhase, FOUR_PHASE_NAMES, FOUR_PHASE_TO_PROTOTYPE, defaultFourPhaseDiscoverer } from './four-phase';
 
 /** 认知原型定义 */
 export interface CognitivePrototype {
@@ -66,6 +67,17 @@ export interface LimitCycleAnalysis {
   dominantPrototype: string;
   /** 是否处于稳定极限环 */
   isStable: boolean;
+  /** === 四相极限环信息（论文 Section 5） === */
+  /** 当前四相 */
+  fourPhase?: FourPhase;
+  /** 四相名称 */
+  fourPhaseName?: string;
+  /** symplectic 角 θ */
+  theta?: number;
+  /** 瞬时角频率 Ω */
+  omega?: number;
+  /** 四相序参量 Φ₄ */
+  phi4?: number;
 }
 
 /**
@@ -186,10 +198,11 @@ export class PrototypeMatcher {
   }
 
   /**
-   * 极限环分析：分析认知历史轨迹的稳定性
+   * 极限环分析：分析认知历史轨迹的稳定性（含四相极限环）
    *
    * 借鉴灵枢·HexQ 的"四象流转守恒"律：
    *   认知偏离原型后必回归，偏离幅度 ≈ 回归幅度。
+   *   四相极限环（论文 Section 5）在此基础上增加了动态相位发现。
    *
    * @param history  认知状态历史
    * @param current  当前认知状态
@@ -218,14 +231,16 @@ export class PrototypeMatcher {
     const avgDeviation = history.length > 0 ? sumDeviation / history.length : 0;
 
     // 守恒律预测：偏离幅度 ≈ 回归幅度
-    // 如果当前偏离大于历史平均，预测将回归（减小）
-    // 如果当前偏离小于历史平均，预测可能继续偏离（增大）
     const predictedReturn = currentDeviation > avgDeviation
-      ? -(currentDeviation - avgDeviation)  // 预测回归
-      : (avgDeviation - currentDeviation) * 0.5;  // 预测小幅偏离
+      ? -(currentDeviation - avgDeviation)
+      : (avgDeviation - currentDeviation) * 0.5;
 
     // 是否稳定：Φ > 0.5 且当前偏离 < 阈值
     const isStable = phi > 0.5 && currentDeviation <= threshold;
+
+    // === 四相极限环分析 ===
+    const fpAnalysis = defaultFourPhaseDiscoverer.analyze(current);
+    const fpStability = defaultFourPhaseDiscoverer.getStability();
 
     return {
       phi,
@@ -234,7 +249,12 @@ export class PrototypeMatcher {
       avgDeviation,
       predictedReturn,
       dominantPrototype: currentMatch.prototype.name,
-      isStable
+      isStable,
+      fourPhase: fpAnalysis.phase,
+      fourPhaseName: fpAnalysis.phaseName,
+      theta: fpAnalysis.theta,
+      omega: fpAnalysis.omega,
+      phi4: fpStability.phi
     };
   }
 
@@ -294,7 +314,18 @@ export function limitCycleSnapshot(
   prototypes: { name: string; distance: number; similarity: number }[];
   analysis: LimitCycleAnalysis;
   recommendation: ReturnType<typeof PrototypeMatcher.recommendAction>;
+  /** 四相快照 */
+  fourPhase: {
+    phase: string;
+    phaseName: string;
+    theta: number;
+    omega: number;
+    omegaDot: number;
+    isTransitioning: boolean;
+  };
 } {
+  const analysis = PrototypeMatcher.analyzeLimitCycle(history, current);
+  const fpAnalysis = defaultFourPhaseDiscoverer.analyze(current);
   return {
     phi: PrototypeMatcher.computePhi(history),
     prototypes: PrototypeMatcher.rankAll(current).map(m => ({
@@ -302,8 +333,16 @@ export function limitCycleSnapshot(
       distance: Number(m.distance.toFixed(4)),
       similarity: Number(m.similarity.toFixed(4))
     })),
-    analysis: PrototypeMatcher.analyzeLimitCycle(history, current),
-    recommendation: PrototypeMatcher.recommendAction(current)
+    analysis,
+    recommendation: PrototypeMatcher.recommendAction(current),
+    fourPhase: {
+      phase: fpAnalysis.phase,
+      phaseName: fpAnalysis.phaseName,
+      theta: Number(fpAnalysis.theta.toFixed(4)),
+      omega: Number(fpAnalysis.omega.toFixed(4)),
+      omegaDot: Number(fpAnalysis.omegaDot.toFixed(4)),
+      isTransitioning: fpAnalysis.isTransitioning
+    }
   };
 }
 

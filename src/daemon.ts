@@ -65,6 +65,11 @@ async function main() {
   let idx = 0;
   let running = false;
 
+  // 呼吸动力学：认知的元节奏
+  const breathPeriodSec = parseInt(process.env.BREATH_PERIOD_SEC || '120', 10);
+  const breath = new BreathingRhythm(breathPeriodSec);
+  console.log(`🌬️ 呼吸节律已启动 (周期 ${breathPeriodSec}s, 吸/呼各 ${breathPeriodSec/2}s)`);
+
   console.log(`🌀 TC-AGI 持久化循环已启动 (间隔 ${intervalSec}s)`);
 
   const tick = async () => {
@@ -76,7 +81,8 @@ async function main() {
       const r = await cognize.cycle(prompt);
       console.log(
         `[${new Date().toISOString()}] ${r.snapshot.state.summary} ` +
-        `| 卦${r.state.hexagramIndex} | 策略: ${r.strategy.name}(${(r.strategy.confidence * 100).toFixed(0)}%)`
+        `| 卦${r.state.hexagramIndex} | 策略: ${r.strategy.name}(${(r.strategy.confidence * 100).toFixed(0)}%)` +
+        ` | 🌬️ ${breath.phaseName} β=${breath.phase.toFixed(2)}`
       );
     } catch (e) {
       console.error('循环异常:', (e as Error).message);
@@ -102,3 +108,67 @@ main().catch((e) => {
   console.error('Daemon 启动失败:', e);
   process.exit(1);
 });
+/**
+ * 呼吸动力学（Breathing Dynamics）
+ * ─────────────────────────────────────────────────────────────
+ * 论文 Section 6.1：呼吸是认知场的元节奏。
+ * β(t) = cos(2πt / T_b) ∈ [-1, 1]
+ *   β < 0 → 吸入（inhale）：打开感知通道，接收外部数据
+ *   β > 0 → 呼出（exhale）：关闭感知，发出决策
+ *
+ * 四相呼吸节律：
+ *   β = +1 → Old Yang（老阳）：呼出峰值，最大行动
+ *   β = -1 → Old Yin（老阴）：吸入峰值，最大感知
+ *   β 穿越 0 → 相位转换
+ */
+export class BreathingRhythm {
+  private periodMs: number;
+  private startTime: number;
+
+  constructor(periodSec: number = 120) {
+    // 默认呼吸周期 120 秒（2 分钟一次完整吸呼）
+    this.periodMs = periodSec * 1000;
+    this.startTime = Date.now();
+  }
+
+  /** 当前呼吸相位 β ∈ [-1, 1] */
+  get phase(): number {
+    const elapsed = (Date.now() - this.startTime) % this.periodMs;
+    const rad = (2 * Math.PI * elapsed) / this.periodMs;
+    return Math.cos(rad);
+  }
+
+  /** 是否处于吸入阶段（感知开放） */
+  get isInhaling(): boolean {
+    return this.phase < 0;
+  }
+
+  /** 是否处于呼出阶段（决策发出） */
+  get isExhaling(): boolean {
+    return this.phase >= 0;
+  }
+
+  /** 呼吸强度：0~1，|β| 越大越强 */
+  get intensity(): number {
+    return Math.abs(this.phase);
+  }
+
+  /** 四相名称 */
+  get phaseName(): string {
+    const p = this.phase;
+    if (p > 0.5) return '老阳·呼出峰值';
+    if (p > 0) return '少阴·呼出→吸入';
+    if (p > -0.5) return '老阴·吸入峰值';
+    return '少阳·吸入→呼出';
+  }
+
+  /** 重置呼吸周期 */
+  reset(): void {
+    this.startTime = Date.now();
+  }
+
+  /** 设置周期（秒） */
+  setPeriod(sec: number): void {
+    this.periodMs = sec * 1000;
+  }
+}

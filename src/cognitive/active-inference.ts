@@ -681,3 +681,42 @@ export class ActiveInference {
     };
   }
 }
+/**
+ * 呼吸门控精度（Breathing-Gated Precision）
+ * ─────────────────────────────────────────────────────────────
+ * 论文 Section 6.1：呼吸节律 β(t) = cos(2πt / T_b) 控制感知/行动的权重分配。
+ *
+ * 在吸入阶段（β < 0）：感知维度（空间外部、时间现在）精度提升
+ * 在呼出阶段（β > 0）：行动维度（因果原因、结果）精度提升
+ *
+ * @param beta 当前呼吸相位 β ∈ [-1, 1]
+ * @param basePrecision 基础精度权重（可选，默认等权）
+ * @returns 呼吸门控后的精度权重
+ */
+export function applyBreathingGate(
+  beta: number,
+  basePrecision?: PrecisionWeights
+): PrecisionWeights {
+  const base = basePrecision || DEFAULT_PRECISION;
+
+  // β ∈ [-1, 1]，映射到门控因子 [0.5, 1.5]
+  const gateFactor = (b: number) => 1.0 + b * 0.5;
+
+  // 吸入阶段（β < 0）：感知增强
+  const perceptionBoost = beta < 0 ? 1 + Math.abs(beta) * 0.5 : 1.0;
+
+  // 呼出阶段（β > 0）：行动增强
+  const actionBoost = beta > 0 ? 1 + beta * 0.5 : 1.0;
+
+  return {
+    past: base.past * gateFactor(beta * 0.3),
+    present: base.present * perceptionBoost,
+    future: base.future * gateFactor(-beta * 0.2),
+    internal: base.internal * gateFactor(-beta * 0.3),
+    medial: base.medial * gateFactor(beta * 0.2),
+    external: base.external * perceptionBoost,
+    cause: base.cause * actionBoost,
+    condition: base.condition * gateFactor(beta * 0.3),
+    effect: base.effect * actionBoost
+  };
+}

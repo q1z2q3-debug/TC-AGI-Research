@@ -166,4 +166,60 @@ export class TritVectorOps {
   static equals(a: TritVector, b: TritVector): boolean {
     return ALL_DIMENSIONS.every(d => a[d] === b[d]);
   }
+
+  /**
+   * 升映射（Sheng Lift）— 将离散三元向量规范嵌入到 S⁸ 球面
+   *
+   * 论文 Section 4.1：将三元状态 (+1/0/−1) 通过规范嵌入映射到连续流形，
+   * 使得离散的认知状态可以在连续几何空间中演化。
+   * 映射公式：x(s) = ι(s) / ‖ι(s)‖₂ ∈ S⁸ ⊂ ℝ⁹
+   * 零向量（void state）保持为原点，isVoid = true。
+   */
+  static shengLift(v: TritVector): { position: number[]; isVoid: boolean } {
+    const arr = TritVectorOps.toArray(v);
+    const norm = Math.sqrt(arr.reduce<number>((sum, x) => sum + x * x, 0));
+    if (norm === 0) return { position: [0, 0, 0, 0, 0, 0, 0, 0, 0], isVoid: true };
+    return { position: arr.map(x => x / norm), isVoid: false };
+  }
+
+  /**
+   * 逆映射（round）— 从 S⁸ 球面坐标回到最近的离散三元向量
+   */
+  static roundFromSheng(position: number[]): TritVector {
+    if (position.length !== 9) throw new Error('需要9维坐标');
+    const arr: Trit[] = position.map(x => {
+      if (x > 0.5) return 1;
+      if (x < -0.5) return -1;
+      return 0;
+    }) as Trit[];
+    return TritVectorOps.fromArray(arr);
+  }
+
+  /**
+   * 球面距离（测地线距离）— 在 S⁸ 上的最短弧长，范围 0~π
+   */
+  static sphericalDistance(a: TritVector, b: TritVector): number {
+    const liftedA = TritVectorOps.shengLift(a);
+    const liftedB = TritVectorOps.shengLift(b);
+    if (liftedA.isVoid || liftedB.isVoid) return Math.PI / 2;
+    let dot = 0;
+    for (let i = 0; i < 9; i++) dot += liftedA.position[i] * liftedB.position[i];
+    return Math.acos(Math.max(-1, Math.min(1, dot)));
+  }
+
+  /**
+   * 辛角（Symplectic Angle）— 在 S⁸ 上的投影相位
+   * 将认知状态投影到两个主导振荡方向 (ξ₁, ξ₂) 上，
+   * 计算相位角 θ(t) = arg(⟨x̂, ξ₁⟩ + i⟨x̂, ξ₂⟩)。
+   * 这是四相极限环发现的核心——四相就是辛角 θ 的四个象限。
+   */
+  static symplecticAngle(v: TritVector, xi1?: number[], xi2?: number[]): number {
+    const lifted = TritVectorOps.shengLift(v);
+    if (lifted.isVoid) return 0;
+    const e1 = xi1 || [0.5, 0, -0.5, 0, 0, 0, 0, 0, 0];
+    const e2 = xi2 || [0, 0, 0, 0, 0, 0, 0.5, 0, -0.5];
+    let proj1 = 0, proj2 = 0;
+    for (let i = 0; i < 9; i++) { proj1 += lifted.position[i] * e1[i]; proj2 += lifted.position[i] * e2[i]; }
+    return Math.atan2(proj2, proj1);
+  }
 }

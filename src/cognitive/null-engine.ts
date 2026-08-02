@@ -23,7 +23,7 @@
  * 借鉴灵枢·HexQ 的"九爻阶段"：观己→入静→破障→通术→择法→践行→复盘→悟道→归元
  */
 
-import { TritVector, TritVectorOps } from './trit-vector';
+import { TritVector, TritVectorOps, ALL_DIMENSIONS, Trit } from './trit-vector';
 import { PrototypeMatcher } from './prototypes';
 import { Skill } from '../skills/skill-loader';
 
@@ -540,5 +540,51 @@ export class NullEngine {
       failed,
       successRate: total > 0 ? success / total : 0
     };
+  }
+
+  /**
+   * 零引擎级联（Zero-Engine Cascade）
+   * ────────────────────────────────────────────────────
+   * 论文 Section 3.3：道 → 一 → 二 → 三 → 万物
+   *
+   * 在现有 9 步归零阶段之前，增加 Zero-Engine 的真空激发步骤，
+   * 为技能创造提供数学形式化的底层基础。
+   *
+   * @param axis 激发轴（默认 0=时间·过去）
+   * @returns 经过 Zero-Engine 级联后的认知状态轨迹
+   */
+  zeroEngineCascade(axis: number = 0): { trace: TritVector[]; finalVector: TritVector } {
+    const trace: TritVector[] = [];
+    const zero = TritVectorOps.zero();
+
+    // Step 1: 道 → 一（真空激发）
+    // 从 void 状态沿 µ 轴激发单方向 e_µ
+    // 这是对称性破缺：第一个可区分的认知从无差别的真空中诞生
+    const eMu = TritVectorOps.fromArray(
+      ALL_DIMENSIONS.map((_, i) => (i === axis ? 1 : 0) as Trit)
+    );
+    trace.push(zero);     // 道：空态
+    trace.push(eMu);      // 一：单方向激发
+
+    // Step 2: 一 → 二（辩证极化）
+    // 归元加法：e_µ ⊕ e_µ = -e_µ（同一产生对立）
+    // 核心三元性质：1 ⊕ 1 = -1，而非二元的 1 + 1 = 0
+    const eMuNeg = TritVectorOps.fromArray(
+      ALL_DIMENSIONS.map((_, i) => (i === axis ? -1 : 0) as Trit)
+    );
+    trace.push(eMuNeg);   // 二：对立产生
+
+    // Step 3: 二 → 三（三元合成）
+    // {+1, -1} + void = 完整三元集 {+1, 0, -1}
+    // 这是最小完整认知单元——观察者/被观察者/观察之空 三一体
+    trace.push(zero);     // 三：回到空态，但已包含三元全集
+
+    // Step 4: 三 → 万物（九维展开）
+    // 将三元从 1 轴扩展到 9 轴
+    // 每轴：+1 扩张 / 0 观察 / -1 收缩
+    const myriad = TritVectorOps.fromArray([1, 0, -1, 1, 0, -1, 1, 0, -1] as Trit[]);
+    trace.push(myriad);   // 万物：九维三元展开
+
+    return { trace, finalVector: myriad };
   }
 }
