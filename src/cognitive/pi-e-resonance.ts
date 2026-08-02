@@ -41,6 +41,20 @@ export interface PiEResonanceConfig {
   dt: number;
   /** 是否自适应调整 λ_e（基于认知熵） */
   adaptiveLambda: boolean;
+  /** 是否启用 PI 自适应谐振控制器（§9.5） */
+  enablePIController: boolean;
+  /** PI 比例增益 K_p，默认 0.05（Ziegler-Nichols 调谐） */
+  kp: number;
+  /** PI 积分增益 K_i，默认 0.002 */
+  ki: number;
+  /** 自适应 Ki 的 β 系数，默认 0.3 */
+  kiAdaptiveBeta: number;
+  /** 自适应 Ki 的基频 f₀，默认 0.5 */
+  kiBaseFreq: number;
+  /** 符号变化检测窗口 M，默认 50 */
+  signChangeWindow: number;
+  /** 基频 ω₀（PI 控制器参考），默认 2π/20 */
+  omega0: number;
 }
 
 /** 默认 π-e 谐振配置 */
@@ -50,7 +64,14 @@ export const DEFAULT_PIE_CONFIG: PiEResonanceConfig = {
   alpha: 0.01,
   gamma: 1.0,
   dt: 0.05,
-  adaptiveLambda: true
+  adaptiveLambda: true,
+  enablePIController: false,   // 默认关闭，与现有行为兼容
+  kp: 0.05,
+  ki: 0.002,
+  kiAdaptiveBeta: 0.3,
+  kiBaseFreq: 0.5,
+  signChangeWindow: 50,
+  omega0: 2 * Math.PI / 20
 };
 
 /** π-e 谐振振荡器状态 */
@@ -75,6 +96,14 @@ export interface PiEResonanceState {
   predictedPhase: FourPhase;
   /** 四相转换是否即将发生（θ 接近 π/2 的整数倍） */
   nearTransition: boolean;
+  /** PI 控制器：当前谐振频率 ω_res（§9.5） */
+  omegaRes: number;
+  /** PI 控制器：Δ_πe 失配量 */
+  deltaPiE: number;
+  /** PI 控制器：积分项累积 */
+  integralTerm: number;
+  /** PI 控制器：有效 K_i（可能被自适应调整） */
+  effectiveKi: number;
 }
 
 /** 四相相位区间（θ 在 [-π, π] 中） */
@@ -96,6 +125,10 @@ export class PiEResonance {
   private state: PiEResonanceState;
   private history: PiEResonanceState[] = [];
   private readonly MAX_HISTORY = 1000;
+  /** PI 控制器：符号变化历史（用于自适应 Ki） */
+  private signHistory: number[] = [];
+  /** PI 控制器：前一次 Δ_πe 值（用于符号变化检测） */
+  private prevDeltaPiE: number = 0;
 
   constructor(config: Partial<PiEResonanceConfig> = {}) {
     this.config = { ...DEFAULT_PIE_CONFIG, ...config };
@@ -110,6 +143,7 @@ export class PiEResonance {
     const lambdaE = this.config.lambda0;
     const stableRadius = Math.sqrt(lambdaE / this.config.gamma);
     const floquet = Math.exp(-2 * lambdaE * (2 * Math.PI / this.config.omegaPi));
+    const omega0 = this.config.omega0;
 
     return {
       z: z0,
@@ -121,26 +155,38 @@ export class PiEResonance {
       isStable: lambdaE > 0,
       step: 0,
       predictedPhase: this.phaseToFourPhase(ph),
-      nearTransition: false
+      nearTransition: false,
+      omegaRes: omega0,
+      deltaPiE: 0,
+      integralTerm: 0,
+      effectiveKi: this.config.ki
     };
   }
 
   /**
    * 步进：执行一步 Stuart-Landau 积分（RK4 方法）
    * ż = (λ_e + iω_π)z - γ|z|²z
+   *
+   * 若启用 PI 控制器（§9.5），ω_π 由自适应谐振控制：
+   *   Δ_πe = ||∇H_kin|| - ||∇E_Ising||
+   *   ω_res(t) = ω₀ + K_p·Δ_πe(t) + K_i·∫Δ_πe(τ)dτ
    */
   step(cognitiveEntropy?: number): PiEResonanceState {
-    const { dt, omegaPi, gamma, alpha, adaptiveLambda } = this.config;
+    const { dt, gamma, alpha, adaptiveLambda } = this.config;
     const z = this.state.z;
 
     // 自适应 λ_e：基于认知熵调整
     if (adaptiveLambda && cognitiveEntropy !== undefined) {
-      // 高认知熵 → λ_e 降低（更保守，稳定边界）
-      // 低认知熵 → λ_e 升高（更自信，振幅增长）
       const entropyFactor = 1 - Math.min(cognitiveEntropy, 1.0) * 0.5;
       this.state.lambdaE = this.config.lambda0 * Math.exp(this.config.alpha * this.state.step) * entropyFactor;
     } else {
       this.state.lambdaE = this.config.lambda0 * Math.exp(this.config.alpha * this.state.step);
+    }
+
+    // PI 自适应谐振控制器（§9.5）
+    let omegaPi = this.config.omegaPi;
+    if (this.config.enablePIController) {
+      omegaPi = this.computePiResonantFrequency(z);
     }
 
     // RK4 积分
@@ -179,7 +225,11 @@ export class PiEResonance {
       isStable: this.state.lambdaE > 0,
       step: this.state.step + 1,
       predictedPhase,
-      nearTransition: this.detectNearTransition(ph)
+      nearTransition: this.detectNearTransition(ph),
+      omegaRes: omegaPi,
+      deltaPiE: this.state.deltaPiE,
+      integralTerm: this.state.integralTerm,
+      effectiveKi: this.state.effectiveKi
     };
 
     // 记录历史
@@ -213,6 +263,87 @@ export class PiEResonance {
       re: linearRe - dampRe,
       im: linearIm - dampIm
     };
+  }
+
+  /**
+   * PI 自适应谐振控制器（§9.5）
+   * ─────────────────────────────────────────────────────────────
+   * Δ_πe = ||∇H_kin|| - ||∇E_Ising||
+   * ω_res(t) = ω₀ + K_p·Δ_πe(t) + K_i·∫Δ_πe(τ)dτ
+   *
+   * 当动能主导（Δ_πe > 0）：频率增加，加速循环
+   * 当Ising能主导（Δ_πe < 0）：频率降低，深化结构耦合
+   */
+  private computePiResonantFrequency(z: { re: number; im: number }): number {
+    const { kp, ki, omega0, dt } = this.config;
+
+    // 计算 ||∇H_kin||：动能梯度 = |ż|（导数幅值）
+    const dz = this.dzdt(z, this.state.lambdaE, this.state.omegaRes, this.config.gamma);
+    const kineticGrad = Math.sqrt(dz.re ** 2 + dz.im ** 2);
+
+    // 计算 ||∇E_Ising||：Ising 势能梯度 = 振幅 |z|（耦合强度代理）
+    const isingGrad = Math.sqrt(z.re ** 2 + z.im ** 2);
+
+    // Δ_πe = ||∇H_kin|| - ||∇E_Ising||
+    const delta = kineticGrad - isingGrad;
+    this.state.deltaPiE = delta;
+
+    // 积分项累积（带防饱和）
+    const dtSec = dt * 100; // 归一化时间尺度
+    let integral = this.state.integralTerm + delta * dtSec;
+    integral = Math.max(-10, Math.min(10, integral)); // 防饱和
+    this.state.integralTerm = integral;
+
+    // 自适应 Ki（§A.2.5）：基于符号变化频率
+    if (this.state.step > 0 && this.state.step % 10 === 0) {
+      this.state.effectiveKi = this.computeAdaptiveKi(delta);
+    }
+
+    // ω_res(t) = ω₀ + K_p·Δ_πe + K_i·∫Δ_πe
+    const omegaRes = omega0 + kp * delta + this.state.effectiveKi * integral;
+
+    // 安全限幅：ω_res ∈ [ω₀/4, 4·ω₀]
+    const omegaMin = omega0 * 0.25;
+    const omegaMax = omega0 * 4.0;
+    return Math.max(omegaMin, Math.min(omegaMax, omegaRes));
+  }
+
+  /**
+   * 自适应 Ki（附录 A.2.5）
+   * ─────────────────────────────────────────────────────────────
+   * K_i(t) = K_i,0 × (1 + β·(f_sign(t) - f₀)/f₀)
+   *
+   * f_sign(t)：最近 M=50 次更新中 e(t) 的符号变化频率
+   * 快速符号变化（f > 0.7，振荡市场）：增加 Ki 加速收敛
+   * 慢速符号变化（f < 0.3，趋势市场）：降低 Ki 减少超调
+   */
+  private computeAdaptiveKi(delta: number): number {
+    // 记录符号变化
+    const currentSign = delta >= 0 ? 1 : -1;
+    const prevSign = this.prevDeltaPiE >= 0 ? 1 : -1;
+    if (this.state.step > 0) {
+      this.signHistory.push(currentSign !== prevSign ? 1 : 0);
+    }
+    this.prevDeltaPiE = delta;
+
+    // 限制窗口大小
+    const window = this.config.signChangeWindow;
+    while (this.signHistory.length > window) {
+      this.signHistory.shift();
+    }
+
+    // 计算符号变化频率
+    if (this.signHistory.length < 10) return this.config.ki;
+
+    const signChanges = this.signHistory.reduce((a, b) => a + b, 0);
+    const fSign = signChanges / this.signHistory.length;
+
+    // 自适应 Ki
+    const { ki, kiAdaptiveBeta, kiBaseFreq } = this.config;
+    const kiAdapted = ki * (1 + kiAdaptiveBeta * (fSign - kiBaseFreq) / kiBaseFreq);
+
+    // 安全限幅：Ki ∈ [Ki/10, 10·Ki]
+    return Math.max(ki * 0.1, Math.min(ki * 10, kiAdapted));
   }
 
   /** 将相位 θ 映射到四相 */

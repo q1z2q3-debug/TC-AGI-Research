@@ -16,3 +16,4 @@ export * from './empirical-validation';
 export * from './instanton-leap';
 export * from './dream-reasoning';
 export * from './realization-gap';
+export * from './conservation-laws';
