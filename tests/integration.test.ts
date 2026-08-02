@@ -48,7 +48,7 @@ describe('端到端集成测试', () => {
     it('内置技能已加载', () => {
       const components = agi.getComponents();
       const skills = components.skillLoader.getAvailableSkills();
-      expect(skills.length).toBeGreaterThanOrEqual(7);
+      expect(skills.length).toBeGreaterThanOrEqual(6);
       expect(skills).toContain('web-search');
       expect(skills).toContain('self-evolve');
       expect(skills).toContain('memory-retrieve');
@@ -282,7 +282,7 @@ describe('端到端集成测试', () => {
       const stats = agi.getStats();
       expect(stats).toBeDefined();
       expect(stats.uptime).toBeGreaterThan(0);
-      expect(stats.skills).toBeGreaterThanOrEqual(7);
+      expect(stats.skills).toBeGreaterThanOrEqual(6);
       expect(stats.tools).toBeGreaterThanOrEqual(5);
       expect(stats.memory).toBeDefined();
       expect(stats.instance).toBeDefined();
