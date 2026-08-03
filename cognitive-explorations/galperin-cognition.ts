@@ -2,11 +2,11 @@
  * 用我们的三元认知空间"认知"加尔佩林实验
  * 不是写新功能，而是用现有代码作为"认知工具"去解读一个物理发现
  */
-import { contentToTritVector, contentHexagram } from './src/cognitive/semantic';
-import { TritVectorOps } from './src/cognitive/trit-vector';
-import { CognitiveDistance } from './src/cognitive/distance';
-import { PrototypeMatcher, PrototypeDiscovery } from './src/cognitive/prototypes';
-import { ActiveInference, EnvironmentalModel, PRECISION_PRESETS } from './src/cognitive/active-inference';
+import { contentToTritVector, contentHexagram } from '../src/cognitive/semantic';
+import { TritVectorOps } from '../src/cognitive/trit-vector';
+import { CognitiveDistance } from '../src/cognitive/distance';
+import { PrototypeMatcher, PrototypeDiscovery } from '../src/cognitive/prototypes';
+import { ActiveInference, EnvironmentalModel, PRECISION_PRESETS } from '../src/cognitive/active-inference';
 
 // ═══════════════════════════════════════════════════════
 // 第一步：把加尔佩林实验的核心概念逐一喂给语义映射

@@ -102,7 +102,7 @@ npm install
 # Build (TypeScript → dist)
 npm run build
 
-# Run tests (115 tests including end-to-end integration)
+# Run tests (349 tests including end-to-end integration)
 npm test
 
 # Start interactive AGI
@@ -276,6 +276,10 @@ TC-AGI-Research/
 ## Version
 
 v0.7.0-hexq-fusion — 349 tests, 22 cognitive modules, 12,464+ lines of cognitive architecture
+
+See [CHANGELOG.md](CHANGELOG.md) for version history and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+
+Source code comments reference "论文 Section X.X" — see [REFERENCES.md](REFERENCES.md) for the topic index.
 
 ## License
 
