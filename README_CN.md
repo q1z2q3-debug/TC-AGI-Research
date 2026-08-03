@@ -11,7 +11,7 @@
 
 **TC-AGI-Research** implements a **Cognitive Life Body** architecture grounded in **ternary logic** (-1/0/+1), creating a 3⁹ = 19,683-state cognitive space. It integrates **active inference** with precision-weighted free energy, **prototype discovery**, and a **null-engine skill creation loop** for autonomous capability emergence.
 
-> **Empirical Note:** The system has been validated by **27 ACTIVE quantitative factors** (Sharpe 1.27–2.76) on live US equity markets. The factor details are **proprietary and confidential** — referenced here for credibility only. See the [Empirical Validation](#empirical-validation) section for the public summary.
+> **Note:** Earlier versions referenced specific numerical claims (Sharpe ratios, factor counts) from a proprietary platform. Those numbers were real but unverifiable from this repo — they have been removed to keep the focus on what this codebase actually delivers: a working cognitive architecture you can build, test, and extend yourself.
 
 ---
 
@@ -185,18 +185,15 @@ await agi.shutdown();
 | `integration.test.ts` | 22 | End-to-end full flow integration tests |
 | **Total** | **115** | |
 
-## Empirical Validation
+## Validation Methodology
 
-> **Confidentiality Notice:** The factor construction details, source code, and full dataset are **proprietary and confidential**. The following is a public summary for reference only. Do not request access to the underlying factor data.
+The cognitive architecture described here is designed to be **platform-agnostic**: its core innovation is the mapping between ternary cognitive states (-1/0/+1) and decision-making patterns, not any specific backtest result.
 
-The cognitive patterns derived from this architecture have been validated through **27 ACTIVE quantitative factors** on a professional factor platform (US equity market, 2000+ stocks):
+**How the mapping works:** A nine-dimensional trit vector (3⁹ = 19,683 states) defines a cognitive space. Each attractor region in this space can be translated into a decision rule. These patterns can be expressed as alpha expressions, trading rules, or any decision framework the user chooses to implement.
 
-- **Sharpe ratio range**: 1.27–2.76
-- **Self-Correlation breakthrough methods**: 8 distinct approaches
-- **Cross-modal integration**: Fundamentals × Price × News Sentiment × Social Media Sentiment
-- **Validation span**: 9 cognitive modalities explored and verified
+**What this repo provides:** The cognitive substrate — the ternary logic gates, active inference engine, prototype discovery, memory system, and null-engine skill creation loop. How you validate these patterns in your own domain is up to you.
 
-This demonstrates that the ternary cognitive patterns produce measurable, real-world decision-making performance — not just theoretical elegance.
+> **Note:** Earlier versions of this README included specific numerical claims (Sharpe ratios, factor counts) from a proprietary platform. Those numbers were real but unverifiable from this repo — a "trust me, you can't check" statement that doesn't belong in an open-source project. They have been removed to keep the focus on what this codebase actually delivers: a working cognitive architecture you can build, test, and extend yourself.
 
 ## Cognitive Explorations (认知探索分享)
 
@@ -252,7 +249,7 @@ TC-AGI-Research/
 
 ## Version
 
-v0.5.0-deep-evolution — 115 tests, 30 source files, 6,655+ lines of cognitive architecture
+v0.7.0-hexq-fusion — 349 tests, 22 cognitive modules, 12,464+ lines of cognitive architecture
 
 ## License
 
@@ -262,4 +259,3 @@ MIT
 
 **Related projects:**
 - [Cognitive Life Body Paper](https://github.com/q1z2q3-debug/TC-AGI-Research) — Theoretical foundation
-- WQB Alpha Factory — Empirical validation with 27 ACTIVE factors (proprietary, referenced for credibility only)

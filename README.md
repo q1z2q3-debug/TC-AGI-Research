@@ -196,7 +196,7 @@ await agi.shutdown();
 | `embedding.test.ts` | 9 | Cosine similarity, semantic retrieval, degradation |
 | `ideology.test.ts` | 3 | Compliance guard, values |
 | `integration.test.ts` | 22 | End-to-end full flow integration tests |
-| **Total** | **~351** | |
+| **Total** | **349** | |
 
 ## Validation Methodology
 
@@ -275,7 +275,7 @@ TC-AGI-Research/
 
 ## Version
 
-v0.7.0-hexq-fusion — 351+ tests, 22 cognitive modules, 4²⁰+ lines of cognitive architecture
+v0.7.0-hexq-fusion — 349 tests, 22 cognitive modules, 12,464+ lines of cognitive architecture
 
 ## License
 
@@ -285,4 +285,3 @@ MIT
 
 **Related projects:**
 - [Cognitive Life Body](https://github.com/q1z2q3-debug/TC-AGI-Research) — Theoretical foundation
-- WQB Alpha Factory — Empirical validation with 27 ACTIVE factors (proprietary, referenced for credibility only)
