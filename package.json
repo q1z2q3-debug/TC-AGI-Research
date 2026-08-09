@@ -1,6 +1,6 @@
 {
   "name": "tc-agi-research",
-  "version": "0.7.0-hexq-fusion",
+  "version": "0.8.0-daonovice-fusion",
   "description": "四元一体 AGI 生命体——意识形态层、认知空间层、研究引擎层、生命体实例层",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
