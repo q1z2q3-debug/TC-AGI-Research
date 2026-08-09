@@ -21,3 +21,6 @@ export * from './cognitive-phase';
 export * from './fission-layer';
 export * from './tri-state-output';
 export * from './container-sense';
+// ═══ ALLINAI 增量升级模块 ═══
+export * from './meta-skills';
+export * from './logical-levels';
