@@ -10,7 +10,9 @@
     "test": "jest",
     "start:daemon": "ts-node src/daemon.ts",
     "start:loop": "ts-node src/daemon.ts",
-    "lint": "eslint src/**/*.ts"
+    "lint": "eslint src/**/*.ts",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run lint && npm run typecheck && npm test"
   },
   "keywords": [
     "agi",
