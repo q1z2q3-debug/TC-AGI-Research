@@ -251,7 +251,12 @@ TC-AGI-Research/
 │   │   ├── deepseek-cognize.ts # Perceive→Reason→Evolve→Self-Aware cycle
 │   │   ├── semantic.ts     # Semantic mapping (Chinese/English bilingual)
 │   │   ├── llm.ts          # DeepSeek client with graceful degradation
-│   │   └── embedding.ts    # Local Ollama embeddings (zero API cost)
+│   │   ├── embedding.ts    # Local Ollama embeddings (zero API cost)
+│   │   ├── autonomous-loop.ts  # Autonomous perception-action loop (v0.8)
+│   │   ├── knowledge-graph.ts  # Ternary knowledge graph (v0.8)
+│   │   ├── meta-skills.ts      # Meta-skill composition engine (v0.8)
+│   │   ├── resource-manager.ts # Cognitive resource allocation (v0.8)
+│   │   └── logical-levels.ts   # NLP logical level parser (v0.8)
 │   ├── memory/             # Memory system
 │   │   ├── memory-types.ts # Unified type definitions
 │   │   ├── memory-system.ts # Ternary-indexed retrieval memory
@@ -262,9 +267,18 @@ TC-AGI-Research/
 │   │   └── mcp-adapter.ts
 │   ├── scheduler/          # Cron scheduler
 │   │   └── cron-scheduler.ts
-│   ├── daemon.ts           # Persistent daemon runner
+│   ├── utils/              # Utilities
+│   │   └── logger.ts       # Structured logger (zero-dependency)
+│   ├── integration/        # TCAGI4 main class
+│   │   └── index.ts
+│   ├── server.ts           # HTTP cognitive service (API-key secured)
+│   ├── daemon.ts           # Persistent daemon runner + BreathingRhythm
 │   └── index.ts            # Entry point
-├── tests/                  # Jest tests + e2e integration
+├── tests/                  # Jest tests (520+ tests, 31 suites)
+├── examples/               # End-to-end usage examples
+│   └── basic-usage.ts
+├── benchmarks/             # Performance & quality benchmarks
+│   └── task-decomposition.ts
 ├── cognitive-explorations/ # Agent cognitive exploration sharing (rehearsal, not proof)
 ├── .env.example
 ├── jest.config.js
@@ -273,9 +287,46 @@ TC-AGI-Research/
 └── README.md
 ```
 
+## Module Integration Status
+
+All 22 cognitive modules are implemented and unit-tested. Integration into the main execution pipeline varies:
+
+| Status | Modules | Description |
+|--------|---------|-------------|
+| **Wired into main flow** | `trit-vector`, `distance`, `cognitive-space`, `active-inference`, `prototypes`, `null-engine`, `trit-gates`, `four-phase`, `semantic`, `embedding`, `deepseek-cognize`, `llm` | Directly imported by `engine.ts`, `integration/index.ts`, `server.ts`, or `memory-system.ts` |
+| **Indirect dependency** | `four-phase` | Used by `prototypes`, `active-inference`, `five-aggregates`, `instanton-leap`, etc. |
+| **Standalone / importable** | `pi-e-resonance`, `five-aggregates`, `cognitive-resonance`, `empirical-validation`, `instanton-leap`, `dream-reasoning`, `realization-gap`, `conservation-laws`, `cognitive-phase`, `fission-layer`, `tri-state-output`, `container-sense` | Fully implemented with unit tests; can be imported and used independently; not yet called by the main `TCAGI4` pipeline |
+| **v0.8 experimental** | `autonomous-loop`, `knowledge-graph`, `meta-skills`, `resource-manager`, `logical-levels` | New in v0.8; implemented but not yet wired into the main flow or covered by tests |
+
+> **Note:** Modules in the "Standalone" tier are production-quality and tested. They represent advanced cognitive capabilities (dream reasoning, instanton leap, conservation laws, etc.) that can be selectively activated by importing them directly. Wiring all 22 modules into a single execution loop is a P3 roadmap item.
+
+## Experimental & Reference Implementations
+
+### Python Reference Prototypes
+
+`src/core/` contains two Python files — `cognitive_life_engine.py` and `nine_layer_os.py` — that serve as **reference prototypes** exploring the same four-layer architecture in Python. These are:
+
+- **Not part of the TypeScript runtime** and not imported by any TS code
+- **Standard library only** (no external dependencies, no `requirements.txt` needed)
+- **Conceptually overlapping** with the TypeScript implementation (ideology → cognitive → engine → instance)
+- **Useful for** algorithm validation, rapid prototyping, and cross-language comparison
+
+To run them independently:
+```bash
+python src/core/cognitive_life_engine.py
+python src/core/nine_layer_os.py
+```
+
+These files are retained for research reference and are **not** part of the `npm build` / `npm test` pipeline.
+
+## Examples & Benchmarks
+
+- `examples/basic-usage.ts` — End-to-end demo: task submission → cognitive perception → strategy derivation → 4-step execution → evolutionary review. Run with `npx ts-node examples/basic-usage.ts`.
+- `benchmarks/task-decomposition.ts` — Benchmark comparing TC-AGI cognitive strategy vs random baseline vs fixed heuristic on 10 standardized tasks. Run with `npx ts-node benchmarks/task-decomposition.ts`.
+
 ## Version
 
-v0.7.0-hexq-fusion — 349 tests, 22 cognitive modules, 12,464+ lines of cognitive architecture
+v0.8.0-daonovice-fusion — 520+ tests, 22 cognitive modules, HTTP cognitive service (API-key secured), structured logger, memory persistence fix, autonomous loop, knowledge graph, meta-skills, resource manager, logical-levels NLP engine
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 

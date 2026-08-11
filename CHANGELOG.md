@@ -2,6 +2,39 @@
 
 本项目版本号遵循语义化版本（Semantic Versioning），附加阶段标识后缀。
 
+## [0.8.0] - daonovice-fusion — 2026-08
+
+### 新增
+- **认知 HTTP 服务** (`server.ts`)：零依赖 Node 内置 http，提供 /perceive、/infer、/prototype、/memory、/health 端点，默认端口 8899
+- **自主循环引擎** (`autonomous-loop.ts`)：感知→推理→行动→反思闭环，支持目标驱动自主运行
+- **知识图谱** (`knowledge-graph.ts`)：实体-关系三元组存储与检索，支持路径推理
+- **元技能内化系统** (`meta-skills.ts`)：从执行经验中提炼可复用元技能，技能的技能
+- **资源管理器** (`resource-manager.ts`)：CPU/内存/令牌预算追踪与限流，防止资源耗尽
+- **NLP 逻辑层次引擎** (`logical-levels.ts`)：环境/行为/能力/信念/身份/愿景六层逻辑层次解析
+- **Python 九层 OS 参考实现** (`nine_layer_os.py`, `cognitive_life_engine.py`)：与 TS 四层架构概念对齐的 Python 原型（实验性，标注为参考实现）
+- **回归测试套件** (`bugfix-regression.test.ts`)：11 个回归测试覆盖 shengLift nonzeroMask、tritMid 真值表等关键修复
+- **结构化日志工具** (`utils/logger.ts`)：分级日志（debug/info/warn/error），逐步替换 console.log
+- **端到端示例** (`examples/`)：完整任务拆解→认知感知→策略派生→4步执行→进化复盘演示
+- **基准测试** (`benchmarks/`)：TC-AGI 架构 vs 纯 LLM vs 随机策略对比
+
+### 变更
+- 测试数量从 349 增至 470+（新增 engine、server、memory-system、cognitive-space、daemon 等核心编排层测试）
+- `memory-system.shutdown()` 强制 flush 落盘，修复进程退出时最后 500ms 数据丢失
+- `server.ts` 添加 API key 认证、请求体大小限制、输入长度校验、可配置 CORS、优雅关闭（SIGINT/SIGTERM）
+- `daemon.ts` 呼吸动力学（BreathingRhythm）导出为可测试类，四相呼吸节律
+- 统一版本号：package.json / README / README_CN / CHANGELOG 全部对齐到 0.8.0-daonovice-fusion
+
+### 修复
+- shengLift nonzeroMask 修复：升映射逆映射不再将全+1扩张态（每维 0.333）误判为零
+- tritMid 真值表对齐：和态涌现逻辑与三元门定义一致
+- 记忆写入防抖 doFlush 失败不再静默忽略，输出错误日志
+- 步骤依赖引用一致性：generateSteps 中 step ID 与 dependsOn 引用对齐
+
+### 已知限制
+- Python 九层 OS 与 TS 架构无 interop 桥接，仅作参考实现/原型实验
+- 22 个认知模块中部分（pi-e-resonance、five-aggregates、cognitive-resonance 等）尚未接入 TCAGI4 主流程，可独立导入使用
+- server.ts 无 rate limit，生产部署建议前置反向代理（nginx）做限流
+
 ## [0.7.0] - hexq-fusion — 2025
 
 ### 新增

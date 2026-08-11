@@ -262,7 +262,12 @@ TC-AGI-Research/
 │   │   ├── deepseek-cognize.ts # 感知→推理→进化→自省循环
 │   │   ├── semantic.ts     # 语义映射（中英文双语）
 │   │   ├── llm.ts          # DeepSeek 客户端（优雅降级）
-│   │   └── embedding.ts    # 本地 Ollama 嵌入（零 API 成本）
+│   │   ├── embedding.ts    # 本地 Ollama 嵌入（零 API 成本）
+│   │   ├── autonomous-loop.ts  # 自主感知-行动循环（v0.8）
+│   │   ├── knowledge-graph.ts  # 三元知识图谱（v0.8）
+│   │   ├── meta-skills.ts      # 元技能组合引擎（v0.8）
+│   │   ├── resource-manager.ts # 认知资源分配（v0.8）
+│   │   └── logical-levels.ts   # NLP 逻辑层次解析器（v0.8）
 │   ├── memory/             # 记忆系统
 │   │   ├── memory-types.ts # 统一类型定义
 │   │   ├── memory-system.ts # 三元索引检索记忆
@@ -273,9 +278,18 @@ TC-AGI-Research/
 │   │   └── mcp-adapter.ts
 │   ├── scheduler/          # 定时调度器
 │   │   └── cron-scheduler.ts
-│   ├── daemon.ts           # 持久化守护进程
+│   ├── utils/              # 工具函数
+│   │   └── logger.ts       # 结构化日志（零依赖）
+│   ├── integration/        # TCAGI4 主类
+│   │   └── index.ts
+│   ├── server.ts           # HTTP 认知服务（API Key 认证）
+│   ├── daemon.ts           # 持久化守护进程 + 呼吸节律
 │   └── index.ts            # 入口
-├── tests/                  # Jest 测试 + 端到端集成
+├── tests/                  # Jest 测试（520+ 测试，31 套件）
+├── examples/               # 端到端使用示例
+│   └── basic-usage.ts
+├── benchmarks/             # 性能与质量基准测试
+│   └── task-decomposition.ts
 ├── cognitive-explorations/ # Agent 认知探索分享（预演，非数学证明）
 ├── .env.example
 ├── jest.config.js
@@ -284,9 +298,46 @@ TC-AGI-Research/
 └── README.md
 ```
 
+## 模块集成状态
+
+全部 22 个认知模块均已实现并有单元测试覆盖。各模块接入主执行流水线的程度如下：
+
+| 状态 | 模块 | 说明 |
+|------|------|------|
+| **已接入主流程** | `trit-vector`, `distance`, `cognitive-space`, `active-inference`, `prototypes`, `null-engine`, `trit-gates`, `four-phase`, `semantic`, `embedding`, `deepseek-cognize`, `llm` | 被 `engine.ts`、`integration/index.ts`、`server.ts` 或 `memory-system.ts` 直接引用 |
+| **间接依赖** | `four-phase` | 被 `prototypes`、`active-inference`、`five-aggregates`、`instanton-leap` 等模块使用 |
+| **可独立导入** | `pi-e-resonance`, `five-aggregates`, `cognitive-resonance`, `empirical-validation`, `instanton-leap`, `dream-reasoning`, `realization-gap`, `conservation-laws`, `cognitive-phase`, `fission-layer`, `tri-state-output`, `container-sense` | 完整实现并有单元测试，可独立导入使用，尚未接入 `TCAGI4` 主流水线 |
+| **v0.8 实验中** | `autonomous-loop`, `knowledge-graph`, `meta-skills`, `resource-manager`, `logical-levels` | v0.8 新增，已实现但尚未接入主流程或补充测试 |
+
+> **说明：** "可独立导入"层级的模块均为生产质量且经过测试，代表高级认知能力（梦境推理、瞬子跃迁、守恒律等），可通过直接导入选择性激活。将全部 22 个模块接入单一执行循环是 P3 路线图事项。
+
+## 实验与参考实现
+
+### Python 参考原型
+
+`src/core/` 下包含两个 Python 文件 — `cognitive_life_engine.py` 和 `nine_layer_os.py` — 作为**参考原型**，用 Python 探索相同的四层架构。这些文件：
+
+- **不属于 TypeScript 运行时**，不被任何 TS 代码导入
+- **仅使用标准库**（无外部依赖，无需 `requirements.txt`）
+- **与 TypeScript 实现概念重叠**（意识形态→认知→引擎→实例）
+- **用途：** 算法验证、快速原型、跨语言对比
+
+独立运行方式：
+```bash
+python src/core/cognitive_life_engine.py
+python src/core/nine_layer_os.py
+```
+
+这些文件保留用于研究参考，**不**属于 `npm build` / `npm test` 流水线。
+
+## 示例与基准测试
+
+- `examples/basic-usage.ts` — 端到端演示：任务提交→认知感知→策略派生→4步执行→进化复盘。运行：`npx ts-node examples/basic-usage.ts`
+- `benchmarks/task-decomposition.ts` — 基准测试：对比 TC-AGI 认知策略 vs 随机基线 vs 固定启发式，在 10 个标准化任务上评估。运行：`npx ts-node benchmarks/task-decomposition.ts`
+
 ## 版本
 
-v0.7.0-hexq-fusion — 349 测试，22 个认知模块，12,464+ 行认知架构代码
+v0.8.0-daonovice-fusion — 520+ 测试，22 个认知模块，HTTP 认知服务（API Key 认证），结构化日志，记忆持久化修复，自主循环引擎，知识图谱，元技能内化，资源管理器，NLP 逻辑层次引擎
 
 变更历史见 [CHANGELOG.md](CHANGELOG.md)，贡献指南见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
