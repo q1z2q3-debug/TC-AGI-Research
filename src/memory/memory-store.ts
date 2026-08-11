@@ -76,7 +76,7 @@ export class MemoryStore {
         const data = fs.readFileSync(memoryPath, 'utf-8');
         this.memory = JSON.parse(data);
       }
-    } catch (e) {
+    } catch {
       // 文件不存在或解析失败，使用空内存
       this.memory = [];
     }
@@ -93,15 +93,15 @@ export class MemoryStore {
     }
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = null;
-      this.doFlush().catch(() => {
-        // 写入失败静默忽略
+      this.doFlush().catch((e) => {
+        console.error('💾 记忆防抖写入失败:', e instanceof Error ? e.message : String(e));
       });
     }, this.DEBOUNCE_MS);
   }
 
   /**
    * 执行实际的文件写入（仅 Node 环境）。仅当 dirty 为 true 时写入，
-   * 写入失败静默忽略以保持与原有错误处理一致。
+   * 写入失败输出错误日志（不再静默忽略，便于排查持久化问题）。
    */
   private async doFlush(): Promise<void> {
     if (!this.dirty) return;
@@ -119,7 +119,8 @@ export class MemoryStore {
       }
       fs.writeFileSync(memoryPath, JSON.stringify(this.memory, null, 2), 'utf-8');
     } catch (e) {
-      // 忽略写入错误
+      this.dirty = true; // 写入失败时恢复 dirty 标记，下次 flush 重试
+      console.error('💾 记忆持久化写入失败:', e instanceof Error ? e.message : String(e));
     }
   }
 
