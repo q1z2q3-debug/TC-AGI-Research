@@ -115,7 +115,7 @@ export class AutonomousLoop {
    * 提交任务——自动拆解、分步执行、闭环验证
    */
   async submitTask(taskDescription: string, cognitiveSpace: CognitiveSpace): Promise<TaskPlan> {
-    const snapshot = cognitiveSpace.getState();
+    const snapshot = cognitiveSpace.getSnapshot();
     const planId = this.generateId('plan');
     
     const plan: TaskPlan = {

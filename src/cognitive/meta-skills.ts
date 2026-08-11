@@ -23,7 +23,7 @@
  *   - 在审查/复盘时检测违反元技能的行为
  */
 
-import { TritVector, TritVectorOps } from './trit-vector';
+import { TritVector, TritVectorOps, Trit } from './trit-vector';
 
 /** 元技能定义 */
 export interface MetaSkill {
@@ -181,14 +181,14 @@ export class MetaSkillActivator {
     }
 
     // 平均并限制在 -1/0/1
-    const avg = sum.map(v => {
+    const avg: Trit[] = sum.map(v => {
       const avgVal = v / skills.length;
       if (avgVal > 0.3) return 1;
       if (avgVal < -0.3) return -1;
       return 0;
     });
 
-    return TritVectorOps.fromArray(avg as [number,number,number,number,number,number,number,number,number]);
+    return TritVectorOps.fromArray(avg);
   }
 
   /**

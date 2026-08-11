@@ -4,7 +4,7 @@
  * 对应 DaoNovice 架构的"数字生命知识图谱"
  */
 
-import { TritVector } from './trit-vector';
+import { TritVector, TritVectorOps } from './trit-vector';
 
 export interface KnowledgeNode {
   id: string;
@@ -86,7 +86,7 @@ export class KnowledgeGraph {
     const scored: Array<{ node: KnowledgeNode; score: number }> = [];
     
     for (const node of this.nodes.values()) {
-      const distance = node.tritVector.manhattanDistance(vector);
+      const distance = TritVectorOps.manhattanDistance(node.tritVector, vector);
       const recency = Math.exp(-0.1 * (Date.now() - node.lastAccessed) / (24 * 3600 * 1000));
       const score = (1 / (1 + distance)) * 0.7 + node.weight * recency * 0.3;
       scored.push({ node, score });
@@ -163,7 +163,7 @@ export class KnowledgeGraph {
         const b = nodeList[j];
         
         // 计算认知距离
-        const distance = a.tritVector.manhattanDistance(b.tritVector);
+        const distance = TritVectorOps.manhattanDistance(a.tritVector, b.tritVector);
         const similarity = 1 / (1 + distance);
         
         if (similarity > threshold) {

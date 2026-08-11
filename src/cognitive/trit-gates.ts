@@ -70,7 +70,7 @@ export function tritMax(a: Trit, b: Trit): Trit {
  * MID 门（取中/和态涌现）：核心创新
  *
  *   mid(-1, +1) = 0   ← 和态涌现！对立力量平衡
- *   mid(-1,  0) = -1
+ *   mid(-1,  0) = 0   ← 0 是吸收元：任何状态与 0 中和，归于和
  *   mid(-1, -1) = -1
  *   mid( 0, +1) = 0
  *   mid( 0,  0) = 0
@@ -78,12 +78,12 @@ export function tritMax(a: Trit, b: Trit): Trit {
  *
  * 这是三元逻辑独有的门——当阴和阳同时输入时，涌现出"和"。
  * 模拟认知中"矛盾达到平衡时产生新认知"的过程。
+ * 语义：对立(±1)中和为0；含0输入归0（吸收元）；同向保持。
  */
 export function tritMid(a: Trit, b: Trit): Trit {
   // 对立输入 → 和态涌现
-  if (a === -1 && b === 1) return 0;
-  if (a === 1 && b === -1) return 0;
-  // 非对立 → 取平均值方向
+  if ((a === -1 && b === 1) || (a === 1 && b === -1)) return 0;
+  // 含 0 → 0 吸收
   if (a === 0 || b === 0) return 0;
   // 同向 → 保持
   return a; // a === b at this point

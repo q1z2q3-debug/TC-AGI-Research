@@ -1,30 +1,34 @@
+# ─── 构建阶段 ───
 FROM node:20-alpine AS builder
+WORKDIR /build
 
-WORKDIR /app
-
-# 依赖安装层（利用 Docker 缓存）
+# 只复制清单，利用缓存（保留 dev 依赖以使用 tsc 编译）
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 
-# 源码编译
+# 复制源码并编译
 COPY tsconfig.json ./
 COPY src/ ./src/
-RUN npm run build
+RUN npx tsc
 
-# 生产镜像
+# ─── 运行阶段 ───
 FROM node:20-alpine
-
 WORKDIR /app
 
-# 仅复制生产所需
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+ENV NODE_ENV=production
+ENV COGNITIVE_PORT=8899
+ENV COGNITIVE_HOST=0.0.0.0
 
-COPY --from=builder /app/dist ./dist
+# 复制编译产物
+COPY --from=builder /build/dist ./dist
+# 复制运行时依赖（rxjs/uuid/dotenv 是 server 依赖链所需）
+COPY --from=builder /build/node_modules ./node_modules
 
-# 运行时数据目录
+# 记忆持久化目录
 RUN mkdir -p /app/data
 
-EXPOSE 3000
+EXPOSE 8899
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+  CMD wget -qO- http://127.0.0.1:8899/health || exit 1
 
-CMD ["node", "dist/daemon.js"]
+CMD ["node", "dist/server.js"]

@@ -175,21 +175,38 @@ export class TritVectorOps {
    * 映射公式：x(s) = ι(s) / ‖ι(s)‖₂ ∈ S⁸ ⊂ ℝ⁹
    * 零向量（void state）保持为原点，isVoid = true。
    */
-  static shengLift(v: TritVector): { position: number[]; isVoid: boolean } {
+  static shengLift(v: TritVector): { position: number[]; isVoid: boolean; nonzeroMask: boolean[] } {
     const arr = TritVectorOps.toArray(v);
     const norm = Math.sqrt(arr.reduce<number>((sum, x) => sum + x * x, 0));
-    if (norm === 0) return { position: [0, 0, 0, 0, 0, 0, 0, 0, 0], isVoid: true };
-    return { position: arr.map(x => x / norm), isVoid: false };
+    if (norm === 0) return { position: [0, 0, 0, 0, 0, 0, 0, 0, 0], isVoid: true, nonzeroMask: [false, false, false, false, false, false, false, false, false] };
+    return {
+      position: arr.map(x => x / norm),
+      isVoid: false,
+      // 记录非零维掩码：升映射是 x -> x/||x||，逆映射需知道哪些维原本非零，
+      // 否则归一化后的分量（如全+1向量每维=1/√9≈0.333）会被固定阈值 0.5 误判为零。
+      nonzeroMask: arr.map(x => x !== 0)
+    };
   }
 
   /**
    * 逆映射（round）— 从 S⁸ 球面坐标回到最近的离散三元向量
+   *
+   * 修复：旧实现用固定阈值 0.5，但归一化后分量最大只有 1/√k（k=非零维数），
+   * 全+1 扩张态（每维 0.333）会被错误坍缩为全零。现在优先使用 shengLift 的
+   * nonzeroMask 精确还原；无掩码时（外部直接传入数组）用自适应阈值 0.5×max|分量|。
    */
-  static roundFromSheng(position: number[]): TritVector {
+  static roundFromSheng(position: number[], nonzeroMask?: boolean[]): TritVector {
     if (position.length !== 9) throw new Error('需要9维坐标');
-    const arr: Trit[] = position.map(x => {
-      if (x > 0.5) return 1;
-      if (x < -0.5) return -1;
+    const arr: Trit[] = position.map((x, i) => {
+      if (nonzeroMask) {
+        if (!nonzeroMask[i]) return 0;
+        return x >= 0 ? 1 : -1;
+      }
+      // 自适应阈值：以最大绝对值为基准（保证至少最大分量能还原）
+      const maxAbs = Math.max(...position.map(Math.abs), 1e-9);
+      const threshold = maxAbs * 0.5;
+      if (x > threshold) return 1;
+      if (x < -threshold) return -1;
       return 0;
     }) as Trit[];
     return TritVectorOps.fromArray(arr);

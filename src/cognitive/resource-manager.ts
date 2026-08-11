@@ -4,7 +4,7 @@
  * 对应 DaoNovice 的"万物皆备于我"资源哲学
  */
 
-import { TritVector } from './trit-vector';
+import { TritVector, TritVectorOps } from './trit-vector';
 
 export enum ResourceType {
   FILE = 'file',
@@ -85,7 +85,7 @@ export class ResourceManager {
         continue;
       }
       
-      const distance = resource.tritVector.manhattanDistance(vector);
+      const distance = TritVectorOps.manhattanDistance(resource.tritVector, vector);
       const recency = Math.exp(-0.05 * (Date.now() - resource.updatedAt) / (24 * 3600 * 1000));
       const popularity = Math.log(1 + resource.accessCount);
       const score = (1 / (1 + distance)) * 0.5 + recency * 0.3 + popularity * 0.2;
@@ -189,7 +189,7 @@ export class ResourceManager {
         
         if (!a.tritVector || !b.tritVector) continue;
         
-        const distance = a.tritVector.manhattanDistance(b.tritVector);
+        const distance = TritVectorOps.manhattanDistance(a.tritVector, b.tritVector);
         const similarity = 1 / (1 + distance);
         
         if (similarity > threshold) {
