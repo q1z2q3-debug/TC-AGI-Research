@@ -1,0 +1,127 @@
+info:
+  description: "TC-AGI 认知服务：九维三元认知空间（3^9=19683态）、主动推理（精度加权自由能）、原型匹配、三元记忆检索。将输入文本映射为认知向量并输出决策建议。"
+  title: TC-AGI 认知引擎
+  version: v1
+openapi: 3.0.1
+servers:
+  - url: http://tc-agi-cognitive:8899
+paths:
+  /perceive:
+    post:
+      operationId: perceive
+      summary: 认知感知 — 文本映射为九维三元向量与卦象索引
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                text:
+                  description: 输入文本
+                  type: string
+              required:
+                - text
+              type: object
+      responses:
+        "200":
+          description: 认知感知结果：九维向量、卦象索引与态势摘要
+          content:
+            application/json:
+              schema:
+                properties:
+                  vector:
+                    items:
+                      type: number
+                    type: array
+                  hexagramIndex:
+                    type: number
+                  summary:
+                    type: string
+                type: object
+  /infer:
+    post:
+      operationId: infer
+      summary: 主动推理 — 精度加权自由能最小化，输出最佳认知行动
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                text:
+                  description: 输入文本（可选，缺省用当前认知状态）
+                  type: string
+                precisionPreset:
+                  description: 精度预设 execution/observation/crisis
+                  type: string
+              type: object
+      responses:
+        "200":
+          description: 主动推理结果：最佳认知行动与自由能指标
+          content:
+            application/json:
+              schema:
+                properties:
+                  bestAction:
+                    type: string
+                  currentFreeEnergy:
+                    type: number
+                  confidence:
+                    type: number
+                  targetPrototype:
+                    type: string
+                type: object
+  /prototype:
+    post:
+      operationId: prototype
+      summary: 原型匹配 — 当前状态最近的认知原型与推荐行动
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                text:
+                  description: 输入文本
+                  type: string
+              type: object
+      responses:
+        "200":
+          description: 原型匹配结果：最近原型与推荐行动
+          content:
+            application/json:
+              schema:
+                properties:
+                  bestMatch:
+                    type: object
+                  recommendation:
+                    type: object
+                type: object
+  /memory:
+    post:
+      operationId: memory
+      summary: 记忆检索 — 三元索引复合距离检索
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                query:
+                  description: 检索词
+                  type: string
+                limit:
+                  type: number
+              required:
+                - query
+              type: object
+      responses:
+        "200":
+          description: 记忆检索结果：匹配记忆列表
+          content:
+            application/json:
+              schema:
+                properties:
+                  count:
+                    type: number
+                  results:
+                    items:
+                      type: object
+                    type: array
+                type: object
