@@ -6,7 +6,7 @@
 
 ```
 Coze Studio (Docker) ──插件调用──> tc-agi-cognitive 容器 (:8899)
-   OpenAPI 3.0.1           /perceive /infer /prototype /memory
+   OpenAPI 3.0.1           /perceive /infer /prototype /memory (+ /health 探活)
 ```
 
 ## 部署步骤
@@ -89,6 +89,21 @@ docker restart coze-server
 
 - 市场列表应出现 "TC-AGI 认知引擎"（entity_id=10001）
 - 智能体/工作流编辑器 → 插件 → 可拖入 4 个工具
+
+## 端点与返回契约
+
+YAML 中的 schema 与 `src/server.ts` 的实际返回字段对齐，避免 Coze 插件侧生成的
+tool 参数/返回结构与真实响应不一致：
+
+| 端点 | 入参 | 关键返回 |
+| --- | --- | --- |
+| `POST /perceive` | `text*` | `vector`(9维)/`dimensions`/`hexagramIndex`/`summary`/`snapshot` |
+| `POST /infer` | `text?`, `precisionPreset?`(default/execution/observation/crisis) | `bestAction`/`currentFreeEnergy`/`expectedFreeEnergy`/`freeEnergyReduction`/`confidence`/`targetPrototype`/`currentState`/`evaluations[]` |
+| `POST /prototype` | `text?` | `current`/`bestMatch{name,distance,similarity}`/`ranked[]`/`recommendation` |
+| `POST /memory` | `query*`, `limit?(1~50)` | `count`/`results[]`（Memory 结构，含 type/tags/三元索引等） |
+| `GET /health` | — | `ok`/`service`/`state`/`memoryCount`（探活用，不必注册为业务 tool） |
+
+> 4xx 错误统一返回 `{ "error": "..." }`，对应 `ErrorResponse` schema，不暴露内部堆栈。
 
 ## 踩坑记录
 

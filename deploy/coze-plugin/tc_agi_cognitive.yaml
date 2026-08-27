@@ -1,127 +1,380 @@
 info:
-  description: "TC-AGI 认知服务：九维三元认知空间（3^9=19683态）、主动推理（精度加权自由能）、原型匹配、三元记忆检索。将输入文本映射为认知向量并输出决策建议。"
   title: TC-AGI 认知引擎
+  description: "TC-AGI 认知服务：九维三元认知空间（3^9=19683态）、主动推理（精度加权自由能）、原型匹配、三元记忆检索。将输入文本映射为认知向量并输出决策建议。"
   version: v1
 openapi: 3.0.1
 servers:
   - url: http://tc-agi-cognitive:8899
+    description: Docker 容器间直连地址（配合 deploy/coze-plugin/README.md 使用）
+tags:
+  - name: cognitive
+    description: 认知感知、推理与原型匹配
+  - name: memory
+    description: 三元记忆检索
+  - name: system
+    description: 健康检查
+
 paths:
+  /health:
+    get:
+      tags: [system]
+      operationId: health
+      summary: 健康检查 — 返回服务状态、当前认知态势摘要与记忆条数
+      responses:
+        "200":
+          description: 服务存活，返回状态与记忆条数
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
   /perceive:
     post:
+      tags: [cognitive]
       operationId: perceive
       summary: 认知感知 — 文本映射为九维三元向量与卦象索引
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              properties:
-                text:
-                  description: 输入文本
-                  type: string
-              required:
-                - text
-              type: object
+              $ref: "#/components/schemas/TextRequest"
       responses:
         "200":
-          description: 认知感知结果：九维向量、卦象索引与态势摘要
+          description: 认知感知结果：九维向量、卦象索引、态势摘要与认知快照
           content:
             application/json:
               schema:
-                properties:
-                  vector:
-                    items:
-                      type: number
-                    type: array
-                  hexagramIndex:
-                    type: number
-                  summary:
-                    type: string
-                type: object
+                $ref: "#/components/schemas/PerceiveResponse"
+        "400":
+          description: 缺少 text 字段
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: text 超过最大长度
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /infer:
     post:
+      tags: [cognitive]
       operationId: infer
       summary: 主动推理 — 精度加权自由能最小化，输出最佳认知行动
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              properties:
-                text:
-                  description: 输入文本（可选，缺省用当前认知状态）
-                  type: string
-                precisionPreset:
-                  description: 精度预设 execution/observation/crisis
-                  type: string
-              type: object
+              $ref: "#/components/schemas/InferRequest"
       responses:
         "200":
-          description: 主动推理结果：最佳认知行动与自由能指标
+          description: 主动推理结果：最佳认知行动、自由能指标、目标原型与候选评估列表
           content:
             application/json:
               schema:
-                properties:
-                  bestAction:
-                    type: string
-                  currentFreeEnergy:
-                    type: number
-                  confidence:
-                    type: number
-                  targetPrototype:
-                    type: string
-                type: object
+                $ref: "#/components/schemas/InferResponse"
+        "413":
+          description: text 超过最大长度
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /prototype:
     post:
+      tags: [cognitive]
       operationId: prototype
       summary: 原型匹配 — 当前状态最近的认知原型与推荐行动
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              properties:
-                text:
-                  description: 输入文本
-                  type: string
-              type: object
+              $ref: "#/components/schemas/TextOptionalRequest"
       responses:
         "200":
-          description: 原型匹配结果：最近原型与推荐行动
+          description: 原型匹配结果：当前向量、最近原型、Top5 排名与推荐行动
           content:
             application/json:
               schema:
-                properties:
-                  bestMatch:
-                    type: object
-                  recommendation:
-                    type: object
-                type: object
+                $ref: "#/components/schemas/PrototypeResponse"
+        "413":
+          description: text 超过最大长度
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /memory:
     post:
+      tags: [memory]
       operationId: memory
       summary: 记忆检索 — 三元索引复合距离检索
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              properties:
-                query:
-                  description: 检索词
-                  type: string
-                limit:
-                  type: number
-              required:
-                - query
-              type: object
+              $ref: "#/components/schemas/MemoryRequest"
       responses:
         "200":
           description: 记忆检索结果：匹配记忆列表
           content:
             application/json:
               schema:
-                properties:
-                  count:
-                    type: number
-                  results:
-                    items:
-                      type: object
-                    type: array
-                type: object
+                $ref: "#/components/schemas/MemoryResponse"
+        "400":
+          description: 缺少 query 字段
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: query 超过最大长度
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    TextRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          description: 输入文本
+          maxLength: 10000
+
+    TextOptionalRequest:
+      type: object
+      properties:
+        text:
+          type: string
+          description: 输入文本；缺省时使用当前认知状态
+          maxLength: 10000
+
+    InferRequest:
+      type: object
+      properties:
+        text:
+          type: string
+          description: 输入文本（可选，缺省用当前认知状态）
+          maxLength: 10000
+        precisionPreset:
+          type: string
+          enum: [default, execution, observation, crisis]
+          description: "精度预设：default=默认均衡，execution=执行优先，observation=观察优先，crisis=危机模式"
+
+    MemoryRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          description: 检索词
+          maxLength: 10000
+        limit:
+          type: integer
+          description: 返回条数上限（服务端最大 50）
+          default: 10
+          minimum: 1
+          maximum: 50
+
+    VectorView:
+      type: object
+      description: 九维三元向量视图
+      properties:
+        vector:
+          type: array
+          description: 长度固定为 9 的三元向量，元素取值 -1/0/1
+          items:
+            type: integer
+            enum: [-1, 0, 1]
+          minItems: 9
+          maxItems: 9
+        dimensions:
+          type: object
+          description: 九维命名字段（d0~d8）
+          additionalProperties:
+            type: integer
+            enum: [-1, 0, 1]
+        hexagramIndex:
+          type: integer
+          description: 卦象索引（0~19682）
+          minimum: 0
+          maximum: 19682
+        summary:
+          type: string
+          description: 态势摘要（扩张/收缩/观察）
+
+    PerceiveResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        text:
+          type: string
+          description: 回显输入文本
+        vector:
+          type: array
+          items:
+            type: integer
+          description: 九维三元向量（-1/0/1）
+        dimensions:
+          type: object
+          additionalProperties:
+            type: integer
+        hexagramIndex:
+          type: integer
+        summary:
+          type: string
+        snapshot:
+          type: object
+          description: 认知空间当前快照（含状态、历史等运行时结构）
+          additionalProperties: true
+
+    PrototypeView:
+      type: object
+      properties:
+        name:
+          type: string
+        distance:
+          type: number
+        similarity:
+          type: number
+
+    EvaluationView:
+      type: object
+      properties:
+        action:
+          type: string
+        freeEnergy:
+          type: number
+        reason:
+          type: string
+
+    InferResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        bestAction:
+          type: string
+        currentFreeEnergy:
+          type: number
+        expectedFreeEnergy:
+          type: number
+        freeEnergyReduction:
+          type: number
+        confidence:
+          type: number
+        targetPrototype:
+          type: string
+          description: 目标原型名称
+        currentState:
+          $ref: "#/components/schemas/VectorView"
+        evaluations:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvaluationView"
+
+    RecommendationView:
+      type: object
+      additionalProperties: true
+      description: 推荐行动对象（由原型引擎产出，字段随原型动态变化）
+
+    PrototypeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        current:
+          $ref: "#/components/schemas/VectorView"
+        bestMatch:
+          $ref: "#/components/schemas/PrototypeView"
+        ranked:
+          type: array
+          description: 最近的 Top5 原型
+          items:
+            $ref: "#/components/schemas/PrototypeView"
+        recommendation:
+          $ref: "#/components/schemas/RecommendationView"
+
+    MemoryItem:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [user, feedback, topic, reference]
+        name:
+          type: string
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        hexagramIndex:
+          type: integer
+        piDepth:
+          type: integer
+        eWeight:
+          type: number
+        tritVector:
+          type: object
+          additionalProperties:
+            type: integer
+        timestamp:
+          type: integer
+          format: int64
+        accessCount:
+          type: integer
+        lastAccess:
+          type: integer
+          format: int64
+        importance:
+          type: number
+        source:
+          type: string
+        sourceUrl:
+          type: string
+
+    MemoryResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemoryItem"
+
+    HealthResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        service:
+          type: string
+          example: tc-agi-cognitive
+        state:
+          type: string
+        memoryCount:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: 面向调用方的错误信息（不含内部堆栈）
