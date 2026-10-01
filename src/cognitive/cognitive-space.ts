@@ -8,6 +8,9 @@
 
 import { TritVector, TritVectorOps, Trit, TritDimension } from './trit-vector';
 import { contentToTritVector } from './semantic';
+import { CogMemoryPool, getGlobalCogMemoryPool } from './cognitive-memory-pool';
+import { CognitiveDistance } from './distance';
+import { getCogConfig } from './cog-config';
 
 export interface CognitiveState {
   vector: TritVector;
@@ -32,8 +35,11 @@ export class CognitiveSpace {
   private history: CognitiveState[] = [];
   private readonly MAX_HISTORY = 100;
   private readonly HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000; // 7天
+  /** 认知记忆池（19683定长索引），可通过 setCogMemory 注入 */
+  private cogMemory: CogMemoryPool;
 
-  constructor() {
+  constructor(cogMemory?: CogMemoryPool) {
+    this.cogMemory = cogMemory || getGlobalCogMemoryPool();
     const zeroVector = TritVectorOps.zero();
     this.currentState = {
       vector: zeroVector,
@@ -43,6 +49,16 @@ export class CognitiveSpace {
       timestamp: Date.now(),
       summary: '认知初始化 — 悬置观察态'
     };
+  }
+
+  /** 注入自定义认知记忆池 */
+  setCogMemory(pool: CogMemoryPool): void {
+    this.cogMemory = pool;
+  }
+
+  /** 获取认知记忆池 */
+  getCogMemory(): CogMemoryPool {
+    return this.cogMemory;
   }
 
   getState(): CognitiveState {
@@ -226,5 +242,123 @@ export class CognitiveSpace {
     const age = Date.now() - timestamp;
     const halfLives = age / this.HALF_LIFE_MS;
     return Math.exp(-halfLives);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 认知算子集成（收敛检测 / 极端中和 / 记忆召回）
+  // ═══════════════════════════════════════════════════════════════
+
+  /** 当前认知状态是否收敛（到原点偏差 < 收敛阈值） */
+  isConverged(): boolean {
+    return CognitiveDistance.isConverged(this.currentState.vector);
+  }
+
+  /** 获取收敛状态详情 */
+  getConvergenceStatus() {
+    return CognitiveDistance.convergenceStatus(this.currentState.vector);
+  }
+
+  /** 当前认知是否极端（非中和维度数 >= 极端阈值） */
+  isExtreme(): boolean {
+    const config = getCogConfig();
+    return TritVectorOps.isExtreme(this.currentState.vector, config.extremeThreshold);
+  }
+
+  /**
+   * 前置认知处理钩子（AgentStep）
+   *
+   * 每轮推理前执行：
+   *   1. 文本 → 九维向量映射
+   *   2. 极端认知自动中和修正
+   *   3. 召回历史相似认知补充上下文
+   *   4. 收敛校验，未收敛生成反思指令
+   *
+   * @param intentText 用户意图文本
+   * @returns 补充上下文 + 处理后的向量 + 收敛状态
+   */
+  preStep(intentText: string): {
+    supplement: string;
+    targetVector: TritVector;
+    isExtreme: boolean;
+    isConverged: boolean;
+    needsReflection: boolean;
+    reflectionPrompt: string;
+  } {
+    const config = getCogConfig();
+    let targetVec = contentToTritVector(intentText);
+
+    // 2. 极端认知自动中和
+    const isExtreme = TritVectorOps.isExtreme(targetVec, config.extremeThreshold);
+    if (isExtreme) {
+      targetVec = TritVectorOps.neutralizeWithOrigin(targetVec);
+    }
+
+    // 3. 召回历史相似认知
+    const hist = this.cogMemory.searchTopK(targetVec, config.topKNum);
+    const parts: string[] = hist.map(n => `[历史认知] ${n.text}`);
+
+    // 4. 收敛校验
+    const converged = CognitiveDistance.isConverged(targetVec);
+    let needsReflection = false;
+    let reflectionPrompt = '';
+
+    if (!converged) {
+      needsReflection = true;
+      reflectionPrompt =
+        '【认知空间未收敛】当前认知向量偏离原点距离过大，' +
+        '请继续分步推理至目标认知点位收敛，禁止直接结束任务。' +
+        '建议：补充缺失维度的分析，平衡阴阳态势，使认知趋向中和态。';
+      parts.push(reflectionPrompt);
+    }
+
+    return {
+      supplement: parts.join('\n'),
+      targetVector: targetVec,
+      isExtreme,
+      isConverged: converged,
+      needsReflection,
+      reflectionPrompt,
+    };
+  }
+
+  /**
+   * 后置认知处理钩子（AgentPostStep）
+   *
+   * 每轮推理后执行：将推理结果编码为新认知点位写入记忆池
+   *
+   * @param resultText 推理结果文本
+   * @param score 认知重要度评分 [0, 1]
+   */
+  postStep(resultText: string, score: number = 0.5): void {
+    const vec = contentToTritVector(resultText);
+    this.cogMemory.write(vec, resultText, score, ['reasoning', 'post-step']);
+  }
+
+  /**
+   * 双重终止校验
+   *
+   * 第一层：业务完成判定（由调用方传入）
+   * 第二层：认知空间收敛距离阈值
+   *
+   * 只有两层都通过才允许终止，否则强制继续迭代。
+   *
+   * @param businessDone 业务是否完成
+   * @returns 是否可以终止 + 收敛详情
+   */
+  checkTermination(businessDone: boolean): {
+    canTerminate: boolean;
+    businessDone: boolean;
+    cogConverged: boolean;
+    bias: number;
+    threshold: number;
+  } {
+    const status = this.getConvergenceStatus();
+    return {
+      canTerminate: businessDone && status.converged,
+      businessDone,
+      cogConverged: status.converged,
+      bias: status.bias,
+      threshold: status.threshold,
+    };
   }
 }

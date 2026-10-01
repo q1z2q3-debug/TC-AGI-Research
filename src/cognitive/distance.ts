@@ -19,6 +19,7 @@
  */
 
 import { TritVector, TritVectorOps, ALL_DIMENSIONS, TritDimension } from './trit-vector';
+import { CogConfig, getCogConfig } from './cog-config';
 
 /** 加权距离选项 */
 export interface WeightedDistanceOptions {
@@ -94,6 +95,8 @@ export class CognitiveDistance {
    *   - 时间（过去未来）的断裂影响中等
    *   - 因果（因缘果）的偏差影响相对较小但不可忽略
    *
+   * 默认权重从 CogConfig 读取，也可通过 opts 覆盖。
+   *
    * @returns 加权距离（非归一化，原始值）
    */
   static weighted(
@@ -101,9 +104,10 @@ export class CognitiveDistance {
     b: TritVector,
     opts: WeightedDistanceOptions = {}
   ): number {
-    const wTime = opts.timeWeight ?? Math.E;     // e ≈ 2.71828
-    const wSpace = opts.spaceWeight ?? Math.PI;  // π ≈ 3.14159
-    const wCause = opts.causeWeight ?? 0.5772;   // γ (Euler-Mascheroni) ≈ 0.57722
+    const config = getCogConfig();
+    const wTime = opts.timeWeight ?? config.eWeight;
+    const wSpace = opts.spaceWeight ?? config.piWeight;
+    const wCause = opts.causeWeight ?? config.gammaWeight;
 
     let dist = 0;
 
@@ -134,9 +138,10 @@ export class CognitiveDistance {
     b: TritVector,
     opts: WeightedDistanceOptions = {}
   ): number {
-    const wTime = opts.timeWeight ?? Math.E;
-    const wSpace = opts.spaceWeight ?? Math.PI;
-    const wCause = opts.causeWeight ?? 0.5772;
+    const config = getCogConfig();
+    const wTime = opts.timeWeight ?? config.eWeight;
+    const wSpace = opts.spaceWeight ?? config.piWeight;
+    const wCause = opts.causeWeight ?? config.gammaWeight;
     const maxDist = 2 * (3 * wTime + 3 * wSpace + 3 * wCause);
     return CognitiveDistance.weighted(a, b, opts) / maxDist;
   }
@@ -220,6 +225,40 @@ export class CognitiveDistance {
       weighted: Number(CognitiveDistance.weighted(a, b).toFixed(4)),
       weightedNormalized: Number(CognitiveDistance.weightedNormalized(a, b).toFixed(4)),
       composite: Number(CognitiveDistance.composite(a, b).toFixed(4))
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 认知收敛检测
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * 判断认知向量是否收敛（到原点偏差距离 < 收敛阈值）
+   *
+   * 收敛阈值从 CogConfig.convergeThreshold 读取，默认 2.5。
+   * 收敛意味着认知状态接近平衡态，可以终止任务。
+   */
+  static isConverged(v: TritVector, threshold?: number): boolean {
+    const config = getCogConfig();
+    const thresh = threshold ?? config.convergeThreshold;
+    return TritVectorOps.biasToOrigin(v) < thresh;
+  }
+
+  /**
+   * 获取认知收敛状态详情
+   */
+  static convergenceStatus(v: TritVector, threshold?: number): {
+    converged: boolean;
+    bias: number;
+    threshold: number;
+  } {
+    const config = getCogConfig();
+    const thresh = threshold ?? config.convergeThreshold;
+    const bias = TritVectorOps.biasToOrigin(v);
+    return {
+      converged: bias < thresh,
+      bias,
+      threshold: thresh,
     };
   }
 }

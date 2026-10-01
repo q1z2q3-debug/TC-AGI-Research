@@ -235,9 +235,26 @@ export class AutonomousLoop {
         // 检查是否全部完成
         const allDone = plan.subTasks.every(st => st.status === TaskStatus.COMPLETED);
         if (allDone) {
-          plan.status = TaskStatus.COMPLETED;
-          console.log(`✅ 任务计划 ${plan.id} 全部完成`);
-          break;
+          // ━━━ 双重终止校验：业务完成 + 认知空间收敛 ━━━
+          const termCheck = cognitiveSpace.checkTermination(true);
+          if (termCheck.canTerminate) {
+            plan.status = TaskStatus.COMPLETED;
+            console.log(`✅ 任务计划 ${plan.id} 全部完成（认知收敛，偏差=${termCheck.bias.toFixed(4)}）`);
+            break;
+          } else {
+            // 认知未收敛，注入反思子任务强制继续迭代
+            const reflectTask: SubTask = {
+              id: this.generateId('reflect'),
+              description: `认知未收敛（偏差=${termCheck.bias.toFixed(4)}，阈值=${termCheck.threshold}）：继续分步推理至认知收敛，补充缺失维度分析，平衡阴阳态势`,
+              status: TaskStatus.PENDING,
+              dependencies: plan.subTasks.map(s => s.id),
+              retryCount: 0,
+              maxRetries: 1
+            };
+            plan.subTasks.push(reflectTask);
+            console.log(`🔄 任务计划 ${plan.id} 业务已完成但认知未收敛，注入反思子任务`);
+            continue;
+          }
         }
         
         const hasFailed = plan.subTasks.some(st => st.status === TaskStatus.FAILED);
@@ -282,16 +299,26 @@ export class AutonomousLoop {
     subTask.startTime = Date.now();
 
     try {
+      // ━━━ 前置认知钩子：向量映射 + 极端中和 + 记忆召回 + 收敛校验 ━━━
+      const hookOut = cognitiveSpace.preStep(subTask.description);
+      // 将补充上下文注入子任务结果，供后续执行使用
+      (subTask as any).cogSupplement = hookOut.supplement;
+      (subTask as any).cogTargetVector = hookOut.targetVector;
+
       // 认知空间感知当前状态
       cognitiveSpace.perceive(subTask.description);
-      
+
       // 模拟执行——实际项目中将替换为真实执行逻辑
       const result = await this.performTask(subTask, cognitiveSpace);
-      
+
       subTask.result = result;
       subTask.status = TaskStatus.COMPLETED;
       subTask.endTime = Date.now();
-      
+
+      // ━━━ 后置认知钩子：将推理结果写入认知记忆池 ━━━
+      const resultText = typeof result === 'string' ? result : JSON.stringify(result);
+      cognitiveSpace.postStep(resultText, subTask.status === TaskStatus.COMPLETED ? 1.0 : 0.3);
+
       console.log(`  ✅ 子任务完成: ${subTask.description}`);
     } catch (error) {
       subTask.retryCount++;
