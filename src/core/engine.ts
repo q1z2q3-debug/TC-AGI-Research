@@ -173,8 +173,8 @@ export class EngineLayer {
    * 认知驱动的任务分解
    */
   async decomposeTask(goal: string, context?: any): Promise<TaskPlan> {
-    // 1. 感知当前认知状态
-    const cognitiveState = this.cognitive.perceive(goal);
+    // 1. 感知当前认知状态（P0：深度感知，embedding锚点→LLM→规则）
+    const cognitiveState = await this.cognitive.perceiveDeep(goal);
 
     // 2. 推理策略（LLM 统一派生 / 规则回退）
     const strategy = await this.deriveStrategy(cognitiveState);

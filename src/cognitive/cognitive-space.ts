@@ -8,6 +8,8 @@
 
 import { TritVector, TritVectorOps, Trit, TritDimension } from './trit-vector';
 import { contentToTritVector } from './semantic';
+import type { AnchorProjector } from './semantic-anchor';
+import { TransitionGraph } from './transition-graph';
 
 export interface CognitiveState {
   vector: TritVector;
@@ -32,6 +34,10 @@ export class CognitiveSpace {
   private history: CognitiveState[] = [];
   private readonly MAX_HISTORY = 100;
   private readonly HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000; // 7天
+  /** 语义锚点投影器（P0）：注入后 perceiveDeep 走 embedding→LLM→规则 三级链 */
+  private projector: AnchorProjector | null = null;
+  /** 认知转移图（P1）：启用后在 update() 中自动记录状态转移 */
+  private transitionGraph: TransitionGraph | null = null;
 
   constructor() {
     const zeroVector = TritVectorOps.zero();
@@ -95,6 +101,19 @@ export class CognitiveSpace {
   }
 
   /**
+   * 启用认知转移图（P1）：自动学习 P(s'|s)。
+   * 注意：history 有 100 条上限，转移图是长期认知地图（跨会话累计）。
+   */
+  enableTransitionGraph(graph?: TransitionGraph): TransitionGraph {
+    this.transitionGraph = graph || new TransitionGraph();
+    return this.transitionGraph;
+  }
+
+  getTransitionGraph(): TransitionGraph | null {
+    return this.transitionGraph;
+  }
+
+  /**
    * 更新认知状态
    */
   update(updates: Partial<Omit<CognitiveState, 'timestamp'>>): void {
@@ -105,6 +124,12 @@ export class CognitiveSpace {
     }
 
     const newVector = updates.vector || this.currentState.vector;
+
+    // P1：记录认知转移（含自环驻留）
+    if (this.transitionGraph) {
+      this.transitionGraph.recordTransition(this.currentState.vector, newVector);
+    }
+
     this.currentState = {
       vector: newVector,
       hexagramIndex: updates.hexagramIndex ?? TritVectorOps.toHexagramIndex(newVector),
@@ -121,7 +146,32 @@ export class CognitiveSpace {
   perceive(input: string): CognitiveState {
     // 1. 内容分析 → Trit向量（共享语义映射）
     const vector = this.analyzeContent(input);
+    return this.applyPerception(input, vector);
+  }
 
+  /** 注入语义锚点投影器（P0 语义接地） */
+  setProjector(projector: AnchorProjector | null): void {
+    this.projector = projector;
+  }
+
+  get hasProjector(): boolean {
+    return this.projector !== null;
+  }
+
+  /**
+   * 深度感知（P0）：embedding锚点 → LLM → 规则 三级回退链。
+   * 未注入投影器时退化为同步 perceive（规则路径），行为完全一致。
+   */
+  async perceiveDeep(input: string): Promise<CognitiveState> {
+    if (!this.projector) {
+      return this.perceive(input);
+    }
+    const proj = await this.projector.project(input);
+    return this.applyPerception(input, proj.vector);
+  }
+
+  /** 感知内部实现：由向量更新完整认知状态 */
+  private applyPerception(input: string, vector: TritVector): CognitiveState {
     // 2. 计算卦象索引
     const hexagramIndex = TritVectorOps.toHexagramIndex(vector);
 

@@ -27,6 +27,9 @@ import { CognitiveSpace } from './cognitive/cognitive-space';
 import { ActiveInference, InferenceResult } from './cognitive/active-inference';
 import { PrototypeMatcher, PrototypeMatch } from './cognitive/prototypes';
 import { MemorySystem } from './memory/memory-system';
+import { AnchorProjector } from './cognitive/semantic-anchor';
+import { EmbeddingClient } from './cognitive/embedding';
+import { DeepSeekClient } from './cognitive/llm';
 
 const PORT = Number(process.env.COGNITIVE_PORT || 8899);
 const HOST = process.env.COGNITIVE_HOST || '0.0.0.0';
@@ -38,6 +41,13 @@ const MAX_TEXT_LENGTH = Number(process.env.COGNITIVE_MAX_TEXT_LENGTH || 10000);
 // 认知空间（单例：状态在请求间持续）
 const cognitive = new CognitiveSpace();
 const memory = new MemorySystem();
+
+// P0 语义锚点投影：embedding(Ollama) → LLM(DeepSeek) → 关键词规则 三级回退
+const projector = new AnchorProjector({
+  embedding: new EmbeddingClient(),
+  llm: process.env.DEEPSEEK_API_KEY ? new DeepSeekClient() : null
+});
+cognitive.setProjector(projector);
 
 /** JSON 读取辅助（带大小限制） */
 function readBody(req: http.IncomingMessage): Promise<any> {
@@ -130,6 +140,8 @@ function inferenceToJSON(r: InferenceResult) {
 
 async function initialize(): Promise<void> {
   await memory.initialize();
+  const projectorReady = await projector.initialize();
+  if (projectorReady) console.log('🧭 语义锚点投影已就绪（embedding 主路径）');
   cognitive.perceive('系统启动 — 认知服务初始化');
 }
 
@@ -155,7 +167,7 @@ export function createServer(): http.Server {
         const text = String(body.text ?? body.content ?? '');
         if (!text) return send(res, 400, { error: '缺少 text 字段' });
         if (text.length > MAX_TEXT_LENGTH) return send(res, 413, { error: `text 超过最大长度 ${MAX_TEXT_LENGTH}` });
-        const state = cognitive.perceive(text);
+        const state = await cognitive.perceiveDeep(text);
         return send(res, 200, {
           ok: true,
           text,
@@ -168,7 +180,7 @@ export function createServer(): http.Server {
         const body = await readBody(req);
         const text = String(body.text ?? '');
         if (text.length > MAX_TEXT_LENGTH) return send(res, 413, { error: `text 超过最大长度 ${MAX_TEXT_LENGTH}` });
-        const state = text ? cognitive.perceive(text).vector : cognitive.getState().vector;
+        const state = text ? (await cognitive.perceiveDeep(text)).vector : cognitive.getState().vector;
         const options: any = {
           precisionPreset: body.precisionPreset || undefined,
         };
@@ -180,7 +192,7 @@ export function createServer(): http.Server {
         const body = await readBody(req);
         const text = String(body.text ?? '');
         if (text.length > MAX_TEXT_LENGTH) return send(res, 413, { error: `text 超过最大长度 ${MAX_TEXT_LENGTH}` });
-        const state = text ? cognitive.perceive(text).vector : cognitive.getState().vector;
+        const state = text ? (await cognitive.perceiveDeep(text)).vector : cognitive.getState().vector;
         const match = PrototypeMatcher.snapTo(state);
         const ranked = PrototypeMatcher.rankAll(state);
         const recommendation = PrototypeMatcher.recommendAction(state);

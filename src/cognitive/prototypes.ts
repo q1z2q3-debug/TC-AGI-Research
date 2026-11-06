@@ -109,7 +109,9 @@ export const PROTOTYPES: CognitivePrototype[] = [
     vector: TritVectorOps.fromArray([0, 0, 0, 0, 0, 0, 0, 0, 0]),
     actionHint: 'observe',
     element: '水',
-    hexagramIndex: 0 // 全零 → 卦象索引 0
+    // 修复：全零向量经 toHexagramIndex 编码为 9841（三进制全1），
+    // 索引 0 实为全阴（收缩态）——原先硬编码 0 与收缩态撞车。
+    hexagramIndex: TritVectorOps.toHexagramIndex(TritVectorOps.fromArray([0, 0, 0, 0, 0, 0, 0, 0, 0]))
   },
   {
     name: '转化态',

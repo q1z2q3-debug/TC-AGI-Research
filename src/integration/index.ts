@@ -10,6 +10,9 @@ import { CognitiveSpace } from '../cognitive/cognitive-space';
 import { DeepSeekCognize } from '../cognitive/deepseek-cognize';
 import { EmbeddingClient, EmbeddingProvider } from '../cognitive/embedding';
 import { DeepSeekClient } from '../cognitive/llm';
+import { AnchorProjector } from '../cognitive/semantic-anchor';
+import { validateOwnTrajectories, SelfValidationReport, SelfValidationOptions } from '../cognitive/self-validation';
+import { CognitiveWavefunction } from '../cognitive/wavefunction';
 import { MemorySystem } from '../memory/memory-system';
 import { SkillLoader } from '../skills/skill-loader';
 import { MCPAdapter } from '../tools/mcp-adapter';
@@ -32,6 +35,11 @@ export class TCAGI4 {
   private mcp: MCPAdapter;
   private scheduler: CronScheduler;
 
+  /** P0 语义接地：锚点投影器（embedding→LLM→规则） */
+  private projector: AnchorProjector;
+  private embeddingProvider: EmbeddingProvider | null = null;
+  private llmClient: DeepSeekClient | null = null;
+
   private started = false;
   private startTime: Date | null = null;
 
@@ -53,6 +61,41 @@ export class TCAGI4 {
     );
     this.instance = new InstanceLayer(this.engine, this.memory, this.cognitive);
     this.cognize = new DeepSeekCognize(this.cognitive);
+
+    // P0：锚点投影器注入认知空间（embedding/LLM 后至时经 setEmbedding/setLLM 更新）
+    this.projector = new AnchorProjector();
+    this.cognitive.setProjector(this.projector);
+
+    // P1：启用认知转移图（自动学习 P(s'|s)，落地 S* 稀疏子流形）
+    this.cognitive.enableTransitionGraph();
+  }
+
+  /** P1：获取认知地图分析（真实吸引子 / 认知相区 / S* 子流形 / 原型对照） */
+  getCognitiveMap() {
+    const graph = this.cognitive.getTransitionGraph();
+    if (!graph) return null;
+    return {
+      submanifold: graph.getSubmanifold(),
+      attractors: graph.findAttractors(10),
+      communities: graph.detectCommunities().map(c => ({
+        id: c.id, size: c.size, topNode: c.topNode,
+        pagerankMass: Number(c.pagerankMass.toFixed(6))
+      })),
+      prototypeComparison: graph.compareWithPrototypes()
+    };
+  }
+
+  /** P1：自我实证闭环——在自身认知轨迹上验证 H₄ 禁带 / 转移结构 / Φ 聚集 */
+  validateSelf(opts?: SelfValidationOptions): SelfValidationReport {
+    const history = this.cognitive.getHistory().map(h => h.vector);
+    return validateOwnTrajectories(history, opts);
+  }
+
+  /** P2：认知波函数——由历史轨迹构建的分布化认知态（decay<1 时近期权重更高） */
+  getWavefunction(decay: number = 0.95): CognitiveWavefunction {
+    const history = this.cognitive.getHistory().map(h => h.vector);
+    if (history.length === 0) return CognitiveWavefunction.uniform();
+    return CognitiveWavefunction.fromTrajectory(history, decay);
   }
 
   /** 是否已启动 */
@@ -65,8 +108,10 @@ export class TCAGI4 {
    * 应在 start() 之前调用，以便启动时构建向量索引。
    */
   setEmbedding(client: EmbeddingProvider): void {
+    this.embeddingProvider = client;
     this.skillLoader.setEmbeddingClient(client);
     this.mcp.setEmbeddingClient(client);
+    this.projector.setEmbedding(client);
   }
 
   /**
@@ -74,8 +119,10 @@ export class TCAGI4 {
    * 应在 start() 之前或之后调用皆可（setLLM 仅注册引用，不触发网络）。
    */
   setLLM(client: DeepSeekClient): void {
+    this.llmClient = client;
     this.cognize.setLLM(client);
     this.engine.setLLM(client);
+    this.projector.setLLM(client);
   }
 
   async start(): Promise<void> {
@@ -107,6 +154,12 @@ export class TCAGI4 {
       await this.skillLoader.buildIndex();
       await this.mcp.buildIndex();
 
+      // 5.6 P0：初始化语义锚点投影（嵌入锚点缓存；不可用时自动回退 LLM/规则）
+      const projectorReady = await this.projector.initialize();
+      if (projectorReady) {
+        console.log('🧭 语义锚点投影已就绪（embedding 主路径）');
+      }
+
       // 6. 调度器
       await this.scheduler.initialize();
 
@@ -137,8 +190,8 @@ export class TCAGI4 {
       await this.start();
     }
 
-    // 1. 先进行认知觉知
-    const state = this.cognitive.perceive(task);
+    // 1. 先进行认知觉知（P0：深度感知）
+    const state = await this.cognitive.perceiveDeep(task);
     console.log(`📌 认知定位: 卦象 ${state.hexagramIndex} | ${state.summary}`);
 
     // 2. 执行任务

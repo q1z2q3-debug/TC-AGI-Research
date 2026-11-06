@@ -48,8 +48,8 @@ export class InstanceLayer {
     const taskId = `task-${uuidv4().slice(0, 8)}`;
     console.log(`📌 接收任务: ${taskId} -> ${task}`);
 
-    // 1. 感知认知状态
-    const state = this.cognitive.perceive(task);
+    // 1. 感知认知状态（P0：深度感知，embedding锚点→LLM→规则）
+    const state = await this.cognitive.perceiveDeep(task);
 
     // 2. 创建任务上下文
     const taskCtx: TaskContext = {

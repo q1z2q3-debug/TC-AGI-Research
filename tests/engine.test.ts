@@ -18,19 +18,21 @@ import { TritVectorOps } from '../src/cognitive/trit-vector';
 
 function makeCognitiveMock(perceiveResult?: any) {
   const history: any[] = [];
+  const buildState = (input: string) => {
+    const state = perceiveResult || {
+      vector: TritVectorOps.zero(),
+      hexagramIndex: 0,
+      piDepth: 5,
+      eWeight: 0.5,
+      timestamp: Date.now(),
+      summary: `感知: ${input}`
+    };
+    history.push(state);
+    return state;
+  };
   return {
-    perceive: jest.fn((input: string) => {
-      const state = perceiveResult || {
-        vector: TritVectorOps.zero(),
-        hexagramIndex: 0,
-        piDepth: 5,
-        eWeight: 0.5,
-        timestamp: Date.now(),
-        summary: `感知: ${input}`
-      };
-      history.push(state);
-      return state;
-    }),
+    perceive: jest.fn((input: string) => buildState(input)),
+    perceiveDeep: jest.fn(async (input: string) => buildState(input)),
     getState: jest.fn(() => perceiveResult || { vector: TritVectorOps.zero(), summary: 'test' }),
     getHistory: jest.fn(() => history),
     getSnapshot: jest.fn(() => ({ state: { summary: 'test' }, majority: 0 })),
