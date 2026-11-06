@@ -12,3 +12,14 @@ coverage/
 # 运行时数据目录
 data/*
 !data/.gitkeep
+
+# Go 构建产物
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.work.sum

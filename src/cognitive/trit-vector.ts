@@ -25,6 +25,30 @@ export const ALL_DIMENSIONS: TritDimension[] = [
   'cause', 'condition', 'effect'
 ];
 
+// ═══════════════════════════════════════════════════════════════
+// 平衡三进制认知空间常量（与 Go cogspace 包对齐）
+// ═══════════════════════════════════════════════════════════════
+
+/** 认知空间维度数 */
+export const DIM_NUM = 9;
+/** 认知空间离散点位总数 3^9 = 19683 */
+export const TOTAL_NUM = 19683;
+/**
+ * 平衡三进制偏移量，将 [-9841, 9841] 平移到 [0, 19682]
+ * 计算：sum(3^0..3^8) = (3^9 - 1) / (3 - 1) = (19683 - 1) / 2 = 9841
+ */
+export const COG_OFFSET = 9841;
+
+/** 预计算 3 的幂次缓存 [3^0, 3^1, ..., 3^8] */
+const POW3_CACHE: number[] = (() => {
+  const cache: number[] = new Array(DIM_NUM);
+  cache[0] = 1;
+  for (let i = 1; i < DIM_NUM; i++) {
+    cache[i] = cache[i - 1] * 3;
+  }
+  return cache;
+})();
+
 export class TritVectorOps {
   static zero(): TritVector {
     return { past: 0, present: 0, future: 0, internal: 0, medial: 0, external: 0, cause: 0, condition: 0, effect: 0 };
@@ -74,6 +98,95 @@ export class TritVectorOps {
       n = Math.floor(n / 3);
     }
     return TritVectorOps.fromArray(ternary.map(t => (t - 1) as Trit));
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 平衡三进制编码（与 Go cogspace 包完全对齐）
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * 平衡三进制编码：向量 → 全局CogID [0, 19682]
+   *
+   * 编码公式：ID = Σ(v[i] × 3^(8-i)) + COG_OFFSET
+   * 其中 v[i] ∈ {-1, 0, +1}（平衡三进制）
+   *
+   * 注意：与 toHexagramIndex 的偏移base-3编码不同，
+   * toCogID 采用平衡三进制加权编码，与 Go cogspace.CogVector.Encode() 一致。
+   */
+  static toCogID(v: TritVector): number {
+    const arr = TritVectorOps.toArray(v);
+    let sum = 0;
+    for (let i = 0; i < DIM_NUM; i++) {
+      sum += arr[i] * POW3_CACHE[DIM_NUM - 1 - i];
+    }
+    return sum + COG_OFFSET;
+  }
+
+  /**
+   * 平衡三进制解码：CogID → 向量
+   *
+   * 修复要点：JavaScript 的 % 运算符对负数保留被除数符号，
+   * 必须将余数归一化到 {-1, 0, +1} 后执行精确除法。
+   *
+   * 与 Go cogspace.Decode() 完全对齐。
+   */
+  static fromCogID(id: number): TritVector {
+    if (id < 0 || id >= TOTAL_NUM) {
+      throw new Error(`CogID 必须在 [0, ${TOTAL_NUM - 1}] 之间，收到 ${id}`);
+    }
+    let val = id - COG_OFFSET;
+    const digits: Trit[] = new Array(DIM_NUM).fill(0);
+
+    for (let i = 0; i < DIM_NUM; i++) {
+      const pos = DIM_NUM - 1 - i;
+      let r = val % 3;
+      // 将余数转换为平衡三进制数字 {-1, 0, +1}
+      if (r === 2) r = -1;
+      else if (r === -2) r = 1;
+      digits[pos] = r as Trit;
+      // 精确除法：(val - r) 一定能被 3 整除
+      val = (val - r) / 3;
+    }
+
+    return TritVectorOps.fromArray(digits);
+  }
+
+  /** 原点偏差距离（到全和向量的欧式距离），数值越大认知越极端，范围 [0, 6] */
+  static biasToOrigin(v: TritVector): number {
+    return TritVectorOps.euclideanDistance(v, TritVectorOps.zero());
+  }
+
+  /**
+   * 阴阳和合融合算子
+   *
+   * 逐维取和：a[i]+b[i] > 0 → 阳(+1), < 0 → 阴(-1), == 0 → 和(0)
+   * 用于极端偏激向量与原点中和，生成新的平衡认知。
+   */
+  static merge(a: TritVector, b: TritVector): TritVector {
+    const arrA = TritVectorOps.toArray(a);
+    const arrB = TritVectorOps.toArray(b);
+    const result: Trit[] = [];
+    for (let i = 0; i < DIM_NUM; i++) {
+      const sum = arrA[i] + arrB[i];
+      result.push((sum > 0 ? 1 : sum < 0 ? -1 : 0) as Trit);
+    }
+    return TritVectorOps.fromArray(result);
+  }
+
+  /**
+   * 极端认知检测
+   * @param v 认知向量
+   * @param threshold 非中和维度数量阈值，默认7（9维中7维以上偏离平衡态则视为极端）
+   * @returns true = 极端认知，需要中和
+   */
+  static isExtreme(v: TritVector, threshold: number = 7): boolean {
+    const nonZero = TritVectorOps.toArray(v).filter(t => t !== 0).length;
+    return nonZero >= threshold;
+  }
+
+  /** 与原点融合，中和极端偏激（阳+和=阳，阴+和=阴，和+和=和） */
+  static neutralizeWithOrigin(v: TritVector): TritVector {
+    return TritVectorOps.merge(v, TritVectorOps.zero());
   }
 
   /**
