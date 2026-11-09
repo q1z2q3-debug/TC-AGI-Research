@@ -9,7 +9,7 @@
  * 后续可升级为 embedding → 9 特征 → trit 的高保真映射。
  */
 
-import { TritVector, TritVectorOps, Trit, TritDimension } from './trit-vector';
+import { TritVector, TritVectorOps, Trit } from './trit-vector';
 
 export interface TritVectorJSON {
   past: number; present: number; future: number;

@@ -23,9 +23,8 @@
  *   认知停滞时 → 瞬子隧穿
  */
 
-import { TritVector, TritVectorOps, ALL_DIMENSIONS, Trit } from './trit-vector';
-import { CognitiveDistance } from './distance';
-import { FourPhase, FOUR_PHASE_NAMES } from './four-phase';
+import { TritVector, TritVectorOps, Trit } from './trit-vector';
+import { FourPhase } from './four-phase';
 
 /** ========== 类型定义 ========== */
 
@@ -374,7 +373,7 @@ export class InstantonLeap {
   findInstantonTarget(
     currentState: TritVector,
     candidateStates: TritVector[],
-    currentPhase: FourPhase
+    _currentPhase: FourPhase
   ): { target: TritVector; transition: InstantonTransition } | null {
     if (candidateStates.length === 0) return null;
 

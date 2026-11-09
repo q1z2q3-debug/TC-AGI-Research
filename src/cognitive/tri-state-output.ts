@@ -19,7 +19,7 @@
  *   一旦声称"有答案"，结构就固化为内容，违背了结构先于内容公理。
  */
 
-import { CognitivePhase, COGNITIVE_PHASE_NAMES } from './cognitive-phase';
+import { CognitivePhase } from './cognitive-phase';
 
 /** ========== 类型定义 ========== */
 

@@ -21,7 +21,6 @@
  */
 
 import { TritVector, TritVectorOps } from './trit-vector';
-import { CognitivePrototype, PROTOTYPES, PrototypeMatcher } from './prototypes';
 
 /** 四相枚举 */
 export enum FourPhase {
@@ -161,7 +160,7 @@ export class FourPhaseDiscoverer {
 
       if (this.history.length > 1) {
         const prevPrev = this.history[this.history.length - 2];
-        let rawOmegaDot = omega - prevPrev.omega;
+        const rawOmegaDot = omega - prevPrev.omega;
         // e-平滑
         omegaDot = (1 - this.eSmoothing) * prevPrev.omegaDot + this.eSmoothing * rawOmegaDot;
         record.omegaDot = omegaDot;
@@ -226,7 +225,7 @@ export class FourPhaseDiscoverer {
    * 检测相位转换边界
    * 当 Ω 或 Ω̇ 穿越零时触发
    */
-  private detectTransition(currentPhase: FourPhase, record: FourPhaseRecord): boolean {
+  private detectTransition(currentPhase: FourPhase, _record: FourPhaseRecord): boolean {
     if (this.history.length < 2) return false;
 
     const prev = this.history[this.history.length - 1];

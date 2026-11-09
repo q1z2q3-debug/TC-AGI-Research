@@ -22,9 +22,9 @@
  *   认知偏离原型后必回归，偏离幅度 ≈ 回归幅度。
  */
 
-import { TritVector, TritVectorOps, ALL_DIMENSIONS } from './trit-vector';
+import { TritVector, TritVectorOps } from './trit-vector';
 import { CognitiveDistance } from './distance';
-import { FourPhase, FOUR_PHASE_NAMES, FOUR_PHASE_TO_PROTOTYPE, defaultFourPhaseDiscoverer } from './four-phase';
+import { FourPhase, defaultFourPhaseDiscoverer } from './four-phase';
 
 /** 认知原型定义 */
 export interface CognitivePrototype {

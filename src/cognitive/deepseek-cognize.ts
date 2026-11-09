@@ -109,7 +109,7 @@ export class DeepSeekCognize {
   private deriveExpansionStrategy(vector: TritVector): ActionStrategy {
     const steps: string[] = [];
     let name = '主动扩张策略';
-    let confidence = 0.65;
+    let confidence: number;
     const recommendedTools: string[] = ['web_search', 'browser_control'];
 
     if (vector.internal === 1 && vector.external === 1) {
@@ -157,7 +157,7 @@ export class DeepSeekCognize {
   private deriveContractionStrategy(vector: TritVector): ActionStrategy {
     const steps: string[] = [];
     let name = '收缩防御策略';
-    let confidence = 0.65;
+    let confidence: number;
     const recommendedTools: string[] = ['local_file_read', 'shell_exec'];
 
     if (vector.internal === -1) {
@@ -200,7 +200,7 @@ export class DeepSeekCognize {
   private deriveObservationStrategy(vector: TritVector): ActionStrategy {
     const steps: string[] = [];
     let name = '观察学习策略';
-    let confidence = 0.5;
+    let confidence: number;
     const recommendedTools: string[] = ['web_search', 'web_fetch', 'browser_snapshot'];
 
     const zeroDims = TritVectorOps.toArray(vector).filter(v => v === 0).length;

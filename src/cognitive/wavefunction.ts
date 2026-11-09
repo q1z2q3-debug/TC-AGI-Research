@@ -21,7 +21,7 @@
  * 维度编码：dim i 对应卦象索引的三进制第 i 位（高位在前），trit = 位值 - 1。
  */
 
-import { TritVector, TritVectorOps, Trit, TritDimension, ALL_DIMENSIONS } from './trit-vector';
+import { TritVector, TritVectorOps, TritDimension, ALL_DIMENSIONS } from './trit-vector';
 
 /** 态空间大小 3⁹ */
 export const STATE_COUNT = 19683;

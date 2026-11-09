@@ -96,7 +96,7 @@ export class DeepSeekClient implements LLMProvider {
         internal: parsed.internal, medial: parsed.medial, external: parsed.external,
         cause: parsed.cause, condition: parsed.condition, effect: parsed.effect
       };
-    } catch (e) {
+    } catch {
       return null;
     }
   }

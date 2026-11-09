@@ -24,7 +24,6 @@
  */
 
 import { TritVector, TritVectorOps, ALL_DIMENSIONS, Trit } from './trit-vector';
-import { PrototypeMatcher } from './prototypes';
 import { Skill } from '../skills/skill-loader';
 
 /** 技能创造请求 */
@@ -378,7 +377,7 @@ export class NullEngine {
   private inferBlueprint(
     skillName: string,
     request: SkillCreationRequest,
-    memories: any[]
+    _memories: any[]
   ): SkillBlueprint {
     const goal = request.goal;
 
@@ -440,8 +439,6 @@ export class NullEngine {
     blueprint: SkillBlueprint,
     request: SkillCreationRequest
   ): Skill {
-    const self = this;
-
     const skill: Skill = {
       name: blueprint.name,
       description: blueprint.description,

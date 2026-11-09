@@ -4,7 +4,7 @@
  * 对应四元一体中的 "生命体实例层"
  */
 
-import { EngineLayer, TaskPlan, ExecutionResult } from './engine';
+import { EngineLayer, TaskPlan } from './engine';
 import { MemorySystem } from '../memory/memory-system';
 import { CognitiveSpace } from '../cognitive/cognitive-space';
 import { Subject } from 'rxjs';

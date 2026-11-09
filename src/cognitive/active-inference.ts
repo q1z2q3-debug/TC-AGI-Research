@@ -27,10 +27,10 @@
  *   5. 选择自由能最低的行动
  */
 
-import { TritVector, TritVectorOps, ALL_DIMENSIONS, TritDimension, Trit } from './trit-vector';
+import { TritVector, ALL_DIMENSIONS, TritDimension, Trit } from './trit-vector';
 import { CognitiveDistance } from './distance';
 import { PrototypeMatcher, CognitivePrototype, PROTOTYPES } from './prototypes';
-import { vectorShift, vectorMid, vectorMerge } from './trit-gates';
+import { vectorShift } from './trit-gates';
 
 /**
  * 精度权重（Precision Weights）
@@ -278,9 +278,6 @@ export interface ActiveInferenceOptions {
   environmentWeight?: number;
 }
 
-/** 默认自由能阈值 */
-const DEFAULT_FREE_ENERGY_THRESHOLD = 0.1;
-
 export class ActiveInference {
   /**
    * 执行主动推理，选择最佳认知行动
@@ -436,9 +433,9 @@ export class ActiveInference {
    * 原型推荐在评估阶段自然会产生更低的自由能，无需在此预先排序。
    */
   private static generateCandidates(
-    currentState: TritVector,
-    history: TritVector[],
-    opts: ActiveInferenceOptions
+    _currentState: TritVector,
+    _history: TritVector[],
+    _opts: ActiveInferenceOptions
   ): CognitiveAction[] {
     return ['expand', 'contract', 'observe', 'transform', 'create', 'hold'];
   }

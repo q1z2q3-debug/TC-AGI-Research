@@ -148,7 +148,7 @@ export class EngineLayer {
     this.nullEngine = new NullEngine({
       registerSkill: (skill) => this.skillLoader.registerSkill(skill),
       hasSkill: (name) => this.skillLoader.getSkill(name) !== undefined,
-      unregisterSkill: (name) => { /* registerSkill 使用 Map.set 自动覆盖，此处保留接口一致性 */ },
+      unregisterSkill: (_name) => { /* registerSkill 使用 Map.set 自动覆盖，此处保留接口一致性 */ },
       saveMemory: async (memory) => this.memory.save(memory),
       retrieveMemory: (query, limit) => this.memory.retrieve(query, limit || 5),
       llmComplete: this.llm
@@ -330,13 +330,7 @@ export class EngineLayer {
    * 规则策略派生（LLM 不可用时的回退）
    */
   private deriveStrategyViaRules(state: any, majority: number): any {
-    let strategy: any = {
-      name: '平衡策略',
-      mode: 'observe',
-      priority: 2,
-      steps: [],
-      source: 'rules'
-    };
+    let strategy: any;
 
     if (majority === 1) {
       if (state.vector.internal === 1 && state.vector.external === 1) {
@@ -419,7 +413,7 @@ export class EngineLayer {
     strategy: any,
     skillMatches: SkillMatch[],
     toolMatches: ToolMatch[],
-    memories: any[]
+    _memories: any[]
   ): TaskStep[] {
     const steps: TaskStep[] = [];
     const mode = strategy.mode || 'observe';
@@ -532,7 +526,6 @@ export class EngineLayer {
     const startTime = Date.now();
     const results: any[] = [];
     const errors: string[] = [];
-    let allDone = true;
 
     try {
       for (const step of plan.steps) {
@@ -575,7 +568,6 @@ export class EngineLayer {
         if (!success) {
           step.status = 'error';
           errors.push(`步骤 ${step.id} 失败: ${lastError}`);
-          allDone = false;
           // 继续执行其他步骤（不阻断）
         }
       }
@@ -717,7 +709,7 @@ export class EngineLayer {
           : 0.5,
         lesson: String(parsed.lesson || parsed.rootCause)
       };
-    } catch (e) {
+    } catch {
       // 归因失败（网络/解析）→ 不阻断主流程，降级为无归因复盘
       return null;
     }

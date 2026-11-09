@@ -15,8 +15,7 @@
  * 与 empirical-validation.ts 配合，形成完整的可证伪验证框架。
  */
 
-import { TritVector, TritVectorOps, ALL_DIMENSIONS, Trit } from './trit-vector';
-import { FourPhase } from './four-phase';
+import { TritVector, TritVectorOps, ALL_DIMENSIONS } from './trit-vector';
 
 /** ========== 类型定义 ========== */
 
@@ -260,7 +259,7 @@ export class FourSymbolsFlowLaw extends BaseConservationLaw {
     return 0;
   }
 
-  validate(dataSequence: unknown[], tolerance: number = 0.01): LawValidation {
+  validate(dataSequence: unknown[], _tolerance: number = 0.01): LawValidation {
     const invariants: number[] = [];
     for (const seq of dataSequence) {
       if (Array.isArray(seq) && seq.length >= 2) {
@@ -454,7 +453,7 @@ export class SpacetimeMappingLaw extends BaseConservationLaw {
     return 0;
   }
 
-  validate(dataSequence: unknown[], tolerance: number = 0.01): LawValidation {
+  validate(dataSequence: unknown[], _tolerance: number = 0.01): LawValidation {
     const invariants: number[] = [];
     for (const d of dataSequence) {
       if (d !== null && d !== undefined) {
@@ -515,7 +514,7 @@ export class QuantumCorrespondenceLaw extends BaseConservationLaw {
     return 0;
   }
 
-  validate(dataSequence: unknown[], tolerance: number = 0.01): LawValidation {
+  validate(dataSequence: unknown[], _tolerance: number = 0.01): LawValidation {
     const invariants: number[] = [];
     for (const d of dataSequence) {
       if (d !== null && d !== undefined) {
@@ -580,7 +579,7 @@ export class StructuralIntegrityLaw extends BaseConservationLaw {
     return 0;
   }
 
-  validate(dataSequence: unknown[], tolerance: number = 0.01): LawValidation {
+  validate(dataSequence: unknown[], _tolerance: number = 0.01): LawValidation {
     const invariants: number[] = [];
     for (const d of dataSequence) {
       if (d !== null && d !== undefined) {

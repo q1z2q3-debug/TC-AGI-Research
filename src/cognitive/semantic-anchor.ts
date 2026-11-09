@@ -24,7 +24,7 @@
  *   - 无负锚点（因/缘/果维度）：posSim ≥ minSim → +1，否则 → 0
  */
 
-import { TritVector, TritVectorOps, Trit, TritDimension, ALL_DIMENSIONS } from './trit-vector';
+import { TritVector, Trit, TritDimension, ALL_DIMENSIONS } from './trit-vector';
 import { EmbeddingProvider, cosineSimilarity } from './embedding';
 import { contentToTritVector, tritJSONToVector, TritVectorJSON } from './semantic';
 

@@ -28,7 +28,7 @@
  *   不是放弃也不是强推，而是悬置、观察、等待新信息。
  */
 
-import { Trit, TritVector, TritVectorOps, ALL_DIMENSIONS, TritDimension } from './trit-vector';
+import { Trit, TritVector, TritVectorOps, ALL_DIMENSIONS } from './trit-vector';
 
 // ═══════════════════════════════════════════════════════════
 // 基本三元逻辑门（标量级）

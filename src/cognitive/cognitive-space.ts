@@ -6,7 +6,7 @@
  * 语义映射已抽取到 ./semantic（认知空间与记忆系统共用，单一事实来源）
  */
 
-import { TritVector, TritVectorOps, Trit, TritDimension } from './trit-vector';
+import { TritVector, TritVectorOps, Trit } from './trit-vector';
 import { contentToTritVector } from './semantic';
 import type { AnchorProjector } from './semantic-anchor';
 import { TransitionGraph } from './transition-graph';

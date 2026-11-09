@@ -97,17 +97,20 @@ async function main() {
   const shutdown = async () => {
     console.log('\n🛑 收到退出信号，正在优雅关闭...');
     clearInterval(timer);
-    try { await agi.shutdown(); } catch (_) { /* ignore */ }
+    try { await agi.shutdown(); } catch { /* ignore */ }
     process.exit(0);
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 }
 
-main().catch((e) => {
-  console.error('Daemon 启动失败:', e);
-  process.exit(1);
-});
+// 仅在直接执行时启动主循环；被 import（如测试）时不产生副作用
+if (require.main === module) {
+  main().catch((e) => {
+    console.error('Daemon 启动失败:', e);
+    process.exit(1);
+  });
+}
 /**
  * 呼吸动力学（Breathing Dynamics）
  * ─────────────────────────────────────────────────────────────

@@ -19,9 +19,7 @@
  *   11 市场系统 × 5 资产类别 × 10 年数据 (2016-2026)
  */
 
-import { TritVector, TritVectorOps, Trit } from './trit-vector';
-import { CognitiveDistance } from './distance';
-import { FourPhase, defaultFourPhaseDiscoverer } from './four-phase';
+import { FourPhase } from './four-phase';
 
 /** 14 系统基准配置 */
 export interface BenchmarkSystem {
@@ -210,8 +208,6 @@ export class EmpiricalValidation {
     if (predictedLabels.length !== trueLabels.length) {
       throw new Error('预测标签和真实标签长度不匹配');
     }
-
-    const n = predictedLabels.length;
 
     // 计算观测准确率（容忍 ±1 标签偏差）
     const observedAccuracy = EmpiricalValidation.tolerantAccuracy(predictedLabels, trueLabels);

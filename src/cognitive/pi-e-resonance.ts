@@ -172,7 +172,7 @@ export class PiEResonance {
    *   ω_res(t) = ω₀ + K_p·Δ_πe(t) + K_i·∫Δ_πe(τ)dτ
    */
   step(cognitiveEntropy?: number): PiEResonanceState {
-    const { dt, gamma, alpha, adaptiveLambda } = this.config;
+    const { dt, gamma, adaptiveLambda } = this.config;
     const z = this.state.z;
 
     // 自适应 λ_e：基于认知熵调整
@@ -275,7 +275,7 @@ export class PiEResonance {
    * 当Ising能主导（Δ_πe < 0）：频率降低，深化结构耦合
    */
   private computePiResonantFrequency(z: { re: number; im: number }): number {
-    const { kp, ki, omega0, dt } = this.config;
+    const { kp, omega0, dt } = this.config;
 
     // 计算 ||∇H_kin||：动能梯度 = |ż|（导数幅值）
     const dz = this.dzdt(z, this.state.lambdaE, this.state.omegaRes, this.config.gamma);

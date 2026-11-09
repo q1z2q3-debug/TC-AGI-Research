@@ -14,7 +14,7 @@
  * 与 Go cogspace 包的 CogMemory 完全对齐，可双向迁移。
  */
 
-import { TritVector, TritVectorOps, TOTAL_NUM, COG_OFFSET } from './trit-vector';
+import { TritVector, TritVectorOps, TOTAL_NUM } from './trit-vector';
 import { CognitiveDistance } from './distance';
 import * as fs from 'fs';
 import * as path from 'path';

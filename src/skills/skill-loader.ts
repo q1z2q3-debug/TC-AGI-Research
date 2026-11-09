@@ -214,7 +214,7 @@ export class SkillLoader {
 
     // 优先：嵌入语义检索
     if (this.embeddingClient) {
-      let goalVec: number[] | null = null;
+      let goalVec: number[] | null;
       try {
         goalVec = await this.embeddingClient.embed(goal);
       } catch {

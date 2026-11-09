@@ -18,8 +18,8 @@
  *   γ (0.57722)  → 因果维度权重（欧拉常数，因果链的稀疏性）
  */
 
-import { TritVector, TritVectorOps, ALL_DIMENSIONS, TritDimension } from './trit-vector';
-import { CogConfig, getCogConfig } from './cog-config';
+import { TritVector, TritVectorOps, TritDimension } from './trit-vector';
+import { getCogConfig } from './cog-config';
 
 /** 加权距离选项 */
 export interface WeightedDistanceOptions {

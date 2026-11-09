@@ -4,7 +4,6 @@
  * 对应 DaoNovice 架构的"自主生命体闭环"
  */
 
-import { TritVector } from './trit-vector';
 import { CognitiveSpace, CognitiveSnapshot } from './cognitive-space';
 
 export enum TaskStatus {
@@ -147,10 +146,10 @@ export class AutonomousLoop {
    */
   private async decomposeTask(
     task: string, 
-    snapshot: CognitiveSnapshot
+    _snapshot: CognitiveSnapshot
   ): Promise<SubTask[]> {
     const subTasks: SubTask[] = [];
-    const keywords = task.toLowerCase();
+    task.toLowerCase();
     
     // 通用拆解策略
     const steps = this.extractSteps(task);

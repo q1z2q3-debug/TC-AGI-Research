@@ -11,7 +11,7 @@ import { MemoryStore } from './memory-store';
 import { v4 as uuidv4 } from 'uuid';
 import { contentHexagram, contentToTritVector } from '../cognitive/semantic';
 import { CognitiveDistance } from '../cognitive/distance';
-import { TritVector, TritVectorOps } from '../cognitive/trit-vector';
+import { TritVector } from '../cognitive/trit-vector';
 import { Memory, MemoryQuery, MemoryStats } from './memory-types';
 
 export { Memory, MemoryQuery };

@@ -19,7 +19,7 @@
  *   求探索 — 用户需要开放式的思路
  */
 
-import { TritVector, TritVectorOps } from './trit-vector';
+import { TritVector } from './trit-vector';
 
 /** ========== 类型定义 ========== */
 
@@ -162,7 +162,7 @@ export class ContainerSensor {
    * @param text 用户输入文本
    * @param cognitiveVector 当前认知向量（可选，用于增强感知）
    */
-  sense(text: string, cognitiveVector?: TritVector): ContainerSenseResult {
+  sense(text: string, _cognitiveVector?: TritVector): ContainerSenseResult {
     // 1. 提取特征指标
     const indicators = this.extractIndicators(text);
 

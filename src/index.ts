@@ -56,7 +56,7 @@ export function getDefaultAGI(): TCAGI4 {
 /**
  * 快速启动 AGI
  */
-export async function quickStart(options?: { memoryFilePath?: string }): Promise<TCAGI4> {
+export async function quickStart(_options?: { memoryFilePath?: string }): Promise<TCAGI4> {
   const agi = getDefaultAGI();
   if (!agi.isRunning()) {
     await agi.start();

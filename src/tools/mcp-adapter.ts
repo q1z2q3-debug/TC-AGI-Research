@@ -176,7 +176,7 @@ export class MCPAdapter {
     if (!goal) return [];
 
     if (this.embeddingClient) {
-      let goalVec: number[] | null = null;
+      let goalVec: number[] | null;
       try {
         goalVec = await this.embeddingClient.embed(goal);
       } catch {

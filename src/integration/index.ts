@@ -8,7 +8,7 @@ import { EngineLayer } from '../core/engine';
 import { InstanceLayer } from '../core/instance';
 import { CognitiveSpace } from '../cognitive/cognitive-space';
 import { DeepSeekCognize } from '../cognitive/deepseek-cognize';
-import { EmbeddingClient, EmbeddingProvider } from '../cognitive/embedding';
+import { EmbeddingProvider } from '../cognitive/embedding';
 import { DeepSeekClient } from '../cognitive/llm';
 import { AnchorProjector } from '../cognitive/semantic-anchor';
 import { validateOwnTrajectories, SelfValidationReport, SelfValidationOptions } from '../cognitive/self-validation';

@@ -22,8 +22,6 @@
  *   - 螺旋进化：每次循环上升一层
  */
 
-import { TritVector, TritVectorOps } from './trit-vector';
-
 /** 逻辑层次枚举 */
 export enum LogicalLevel {
   Environment = 0,  // 环境

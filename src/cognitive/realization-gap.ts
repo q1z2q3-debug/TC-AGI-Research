@@ -14,8 +14,8 @@
  *      使代理搜索 S* 而非整个超立方体
  */
 
-import { TritVector, TritVectorOps, ALL_DIMENSIONS, Trit } from './trit-vector';
-import { FourPhase, FOUR_PHASE_NAMES } from './four-phase';
+import { TritVector, TritVectorOps } from './trit-vector';
+import { FourPhase } from './four-phase';
 
 /** ========== 类型定义 ========== */
 

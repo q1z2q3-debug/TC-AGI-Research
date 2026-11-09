@@ -17,10 +17,8 @@
  * 梦境/清醒交替比 R_dream/wake ≈ 0.25，模拟哺乳动物睡眠-觉醒周期
  */
 
-import { TritVector, TritVectorOps, ALL_DIMENSIONS, Trit } from './trit-vector';
-import { CognitiveDistance } from './distance';
-import { FourPhase, FOUR_PHASE_NAMES, FourPhaseAnalysis } from './four-phase';
-import { PiEResonanceState } from './pi-e-resonance';
+import { TritVector, TritVectorOps, Trit } from './trit-vector';
+import { FourPhase } from './four-phase';
 
 /** ========== 类型定义 ========== */
 
@@ -298,7 +296,7 @@ export class DreamReasoning {
   private computePredictiveConsistency(
     state: TritVector,
     trajectory: DreamTrajectoryPoint[],
-    step: number
+    _step: number
   ): number {
     if (trajectory.length < 1) return 0.5;
 
@@ -334,7 +332,7 @@ export class DreamReasoning {
   private evolveDreamState(
     current: TritVector,
     reward: number,
-    step: number
+    _step: number
   ): TritVector {
     const arr = TritVectorOps.toArray(current);
 
@@ -363,7 +361,7 @@ export class DreamReasoning {
     trajectory: DreamTrajectoryPoint[]
   ): { dim1: number; dim2: number; instability: number }[] {
     const results: { dim1: number; dim2: number; instability: number }[] = [];
-    const arr = TritVectorOps.toArray(state);
+    TritVectorOps.toArray(state);
 
     // 测试相邻维度的耦合（时间-空间-因果 三组三值）
     const groups = [
@@ -412,7 +410,7 @@ export class DreamReasoning {
   private generateCounterfactuals(
     currentState: TritVector,
     actualPhase: FourPhase,
-    trajectory: DreamTrajectoryPoint[]
+    _trajectory: DreamTrajectoryPoint[]
   ): CounterfactualResult[] {
     const results: CounterfactualResult[] = [];
     const currentArr = TritVectorOps.toArray(currentState);

@@ -172,13 +172,12 @@ export class FissionLayer {
 
     // 4. 悬置
     this.suspend();
-    const suspendDuration = Date.now() - startTime;
 
     // 5. 自问 → 生成重构方案
     const plan = this.selfInquiry(anomaly);
 
     // 6. 最小重构
-    const refactored = this.applyMinimalRefactor(plan);
+    this.applyMinimalRefactor(plan);
 
     // 7. 完整性校验
     let integrityPassed = true;
@@ -367,7 +366,7 @@ export class FissionLayer {
   /**
    * 执行最小重构
    */
-  private applyMinimalRefactor(plan: RefactorPlan): boolean {
+  private applyMinimalRefactor(_plan: RefactorPlan): boolean {
     // 在实际系统中，这里会修改认知结构的配置参数
     // 当前实现为记录重构意图，具体参数调整由上层调用者执行
     return true;
@@ -376,7 +375,7 @@ export class FissionLayer {
   /**
    * 完整性校验
    */
-  private integrityCheck(plan: RefactorPlan, anomaly: AnomalyEvent): { passed: boolean; details: string } {
+  private integrityCheck(plan: RefactorPlan, _anomaly: AnomalyEvent): { passed: boolean; details: string } {
     // 三级校验
     const checks: { name: string; passed: boolean; detail: string }[] = [];
 

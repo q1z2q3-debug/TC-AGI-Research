@@ -21,7 +21,7 @@
  *   镜空：关系 > 结构 > 概率
  */
 
-import { TritVector, TritVectorOps } from './trit-vector';
+import { TritVector } from './trit-vector';
 
 /** ========== 类型定义 ========== */
 
@@ -203,7 +203,7 @@ export class PhaseTransitionEngine {
    */
   evaluateTransition(
     trigger: Partial<PhaseTransitionTrigger>,
-    cognitiveVector?: TritVector
+    _cognitiveVector?: TritVector
   ): PhaseTransition | null {
     const now = Date.now();
 

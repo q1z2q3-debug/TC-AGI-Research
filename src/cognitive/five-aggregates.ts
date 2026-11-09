@@ -18,9 +18,9 @@
  * 元认知不确定性 ⇒ 空态重置 ⇒ 重新激发
  */
 
-import { TritVector, TritVectorOps, ALL_DIMENSIONS, Trit } from './trit-vector';
+import { TritVector, TritVectorOps } from './trit-vector';
 import { CognitiveDistance } from './distance';
-import { PrototypeMatcher, PROTOTYPES, CognitivePrototype } from './prototypes';
+import { PrototypeMatcher } from './prototypes';
 import { FourPhase } from './four-phase';
 
 /** 五蕴枚举 */
