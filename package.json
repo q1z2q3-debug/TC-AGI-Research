@@ -5,14 +5,15 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "dev": "ts-node src/index.ts",
+    "build": "node node_modules/typescript7/bin/tsc",
+    "dev": "tsx src/index.ts",
+    "dev:integration": "tsx src/integration/index.ts",
     "test": "jest",
-    "start:daemon": "ts-node src/daemon.ts",
-    "start:loop": "ts-node src/daemon.ts",
-    "start:server": "ts-node src/server.ts",
+    "start:daemon": "tsx src/daemon.ts",
+    "start:loop": "tsx src/daemon.ts",
+    "start:server": "tsx src/server.ts",
     "lint": "eslint src/**/*.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node node_modules/typescript7/bin/tsc --noEmit",
     "verify": "npm run lint && npm run typecheck && npm test"
   },
   "keywords": [
@@ -41,23 +42,27 @@
   },
   "author": "q1z2q3-debug",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.13"
+  },
   "dependencies": {
     "dotenv": "^18.0.10",
     "rxjs": "^7.8.0",
-    "uuid": "^11.1.1"
+    "uuid": "^14.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@swc/core": "^1.16.22",
+    "@swc/jest": "^0.2.39",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.6.6",
-    "@types/uuid": "^10.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.72.1",
-    "@typescript-eslint/parser": "^8.72.1",
+    "@typescript-eslint/eslint-plugin": "^8.72.2",
+    "@typescript-eslint/parser": "^8.72.2",
     "eslint": "^10.14.0",
     "globals": "^17.14.0",
     "jest": "^30.5.2",
-    "ts-jest": "^29.4.15",
-    "ts-node": "^10.9.0",
-    "typescript": "^6.0.3"
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript7": "npm:typescript@^7.0.2"
   }
 }

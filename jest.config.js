@@ -1,10 +1,22 @@
-/** Jest 配置：使用 ts-jest 直接运行 TypeScript 测试 */
+/** Jest 配置：@swc/jest 转译（TS7 无 JS API，不能用 ts-jest）；uuid 14 为纯 ESM 需一并转译 */
 module.exports = {
-  preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/tests'],
   testMatch: ['**/*.test.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
+  transform: {
+    '^.+\\.(ts|js)$': [
+      '@swc/jest',
+      {
+        jsc: {
+          parser: { syntax: 'typescript' },
+          target: 'es2020',
+        },
+        module: { type: 'commonjs' },
+      },
+    ],
+  },
+  transformIgnorePatterns: ['/node_modules/(?!uuid/)'],
   collectCoverageFrom: ['src/**/*.ts'],
-  coveragePathIgnorePatterns: ['/node_modules/', '/dist/']
+  coveragePathIgnorePatterns: ['/node_modules/', '/dist/'],
 };
