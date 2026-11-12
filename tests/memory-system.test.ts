@@ -25,7 +25,9 @@ describe('MemorySystem', () => {
     system = new MemorySystem();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // 先落盘再清理，避免残留的防抖定时器在环境变量被删后写入默认 data/ 目录
+    await system.shutdown();
     delete process.env.MEMORY_PATH;
     const dir = path.dirname(memPath);
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }

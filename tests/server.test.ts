@@ -45,6 +45,7 @@ describe('Cognitive HTTP Service', () => {
   });
 
   afterAll((done) => {
+    server.closeAllConnections();
     server.close(done);
   });
 
@@ -184,6 +185,7 @@ describe('Cognitive HTTP Service — API Key 认证', () => {
 
   afterAll((done) => {
     delete process.env.COGNITIVE_API_KEY;
+    server.closeAllConnections();
     server.close(done);
   });
 

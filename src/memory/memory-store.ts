@@ -15,6 +15,10 @@ export class MemoryStore {
   private memory: Memory[] = [];
   private isNode = typeof window === 'undefined';
 
+  // Node 模块缓存：在 initialize 阶段解析，避免防抖回调在测试环境销毁后再 import
+  private fsMod: typeof import('fs') | null = null;
+  private pathMod: typeof import('path') | null = null;
+
   // 防抖写入：避免每次 save 都触发文件 I/O，合并为一次批量写入
   private dirty: boolean = false;
   private debounceTimer: any = null;
@@ -24,7 +28,9 @@ export class MemoryStore {
     if (this.initialized) return;
 
     if (this.isNode) {
-      // Node 环境：使用内存存储，并尝试加载文件
+      // Node 环境：缓存 fs/path 后加载文件
+      this.fsMod = await import('fs');
+      this.pathMod = await import('path');
       await this.loadFromFile();
     } else {
       // 浏览器环境：使用 IndexedDB
@@ -62,8 +68,8 @@ export class MemoryStore {
 
   private async loadFromFile(): Promise<void> {
     try {
-      const fs = await import('fs');
-      const path = await import('path');
+      const fs = this.fsMod || await import('fs');
+      const path = this.pathMod || await import('path');
       // 优先使用环境变量 MEMORY_PATH，其次使用项目 data/ 目录
       const memoryPath = process.env.MEMORY_PATH ||
         path.join(process.cwd(), 'data', 'memory.json');
@@ -97,6 +103,8 @@ export class MemoryStore {
         console.error('💾 记忆防抖写入失败:', e instanceof Error ? e.message : String(e));
       });
     }, this.DEBOUNCE_MS);
+    // 防抖定时器不应阻止进程退出（如测试结束后）
+    this.debounceTimer.unref?.();
   }
 
   /**
@@ -107,8 +115,8 @@ export class MemoryStore {
     if (!this.dirty) return;
     this.dirty = false;
     try {
-      const fs = await import('fs');
-      const path = await import('path');
+      const fs = this.fsMod || await import('fs');
+      const path = this.pathMod || await import('path');
       // 优先使用环境变量 MEMORY_PATH，其次使用项目 data/ 目录
       const memoryPath = process.env.MEMORY_PATH ||
         path.join(process.cwd(), 'data', 'memory.json');
