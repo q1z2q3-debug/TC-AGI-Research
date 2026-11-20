@@ -1,0 +1,29 @@
+# TC-AGI-Research：三元逻辑与主动推断的认知生命体
+
+> 3⁹=19,683 状态空间；主动推断、原型发现、Null Engine 技能生成。
+
+Canonical repository: https://github.com/q1z2q3-debug/TC-AGI-Research
+Documentation: https://q1z2q3-debug.github.io/TC-AGI-Research/
+
+## What this is
+
+TC-AGI-Research 是一个四层认知生命体架构：意识形态层、认知空间层、引擎层、实例层。它用 −1/0/+1 三态九维向量构成 19,683 个认知状态，以精度加权自由能最小化做主动推断，并保留可复现的实验边界。
+
+## Entry points
+
+- GitHub: https://github.com/q1z2q3-debug/TC-AGI-Research
+- 快速开始: https://github.com/q1z2q3-debug/TC-AGI-Research/blob/main/README.md#quick-start
+- 认知探索: https://github.com/q1z2q3-debug/TC-AGI-Research/blob/main/cognitive-explorations/README.md
+
+## Citation
+
+- `CITATION.cff` in this repository
+- Author: 润泽（润泽博士）
+- Date: 2026-11-20
+- License: MIT
+
+## Machine-readable
+
+- `llms.txt` (this file)
+- `ai.txt`
+- `CITATION.cff`

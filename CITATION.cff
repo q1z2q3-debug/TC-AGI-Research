@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+type: software
+title: "TC-AGI-Research：三元逻辑与主动推断的认知生命体"
+authors:
+  - family-names: "润泽"
+    given-names: "乔忠"
+    alias: "润泽博士"
+    website: "https://github.com/q1z2q3-debug"
+repository-code: "https://github.com/q1z2q3-debug/TC-AGI-Research"
+url: "https://q1z2q3-debug.github.io/TC-AGI-Research/"
+abstract: "TC-AGI-Research 是一个四层认知生命体架构：意识形态层、认知空间层、引擎层、实例层。它用 −1/0/+1 三态九维向量构成 19,683 个认知状态，以精度加权自由能最小化做主动推断，并保留可复现的实验边界。"
+license: "MIT"
+date-released: 2026-11-20
+keywords:
+  - "active-inference"
+  - "agi"
+  - "ternary-logic"
+  - "cognitive-architecture"
+  - "typescript"
+version: "0.8.0"

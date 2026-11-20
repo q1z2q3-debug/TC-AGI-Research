@@ -340,3 +340,11 @@ MIT
 
 **Related projects:**
 - [Cognitive Life Body](https://github.com/q1z2q3-debug/TC-AGI-Research) — Theoretical foundation
+
+<!-- research-repo-standard -->
+## 研究仓库入口
+
+- 引用：`CITATION.cff`
+- 模型入口：`llms.txt`、`ai.txt`
+- 文档页：https://q1z2q3-debug.github.io/TC-AGI-Research/
+- 许可：MIT
